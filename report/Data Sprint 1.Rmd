@@ -1,0 +1,113 @@
+---
+title: "Data"
+author: "Michael McDonagh (2392623)"
+date: "2026-10-05"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+## Data 
+
+# Import
+
+First we automatically import the data for 23 seasons of English football from the top 4 divisions.
+We are pulling all our data from Football-Data.co.uk, a site containing results, match statistics and betting odds
+
+```{r}
+if(!dir.exists(file.path("..", "data"))){
+  dir.create(file.path("..", "data"))
+}
+
+years<-2003:2025
+
+leagues<-c(
+  E0 = "Premier_League",
+  E1 = "Championship",
+  E2 = "League_1",
+  E3 = "League_2"
+)
+
+for(year in years){
+  season<-paste0(
+    substr(year, 3, 4),
+    sprintf("%02d", (year+1) %% 100)
+  )
+  
+  for(league_code in names(leagues)){
+    league_name<-leagues[[league_code]]
+    
+    
+    file_name<-paste0(league_name, "_data_", season, ".csv")
+    file_path<-file.path("..", "data", file_name)
+    
+    if(!file.exists(file_path)){
+      url<-paste0("https://football-data.co.uk/mmz4281/", season, "/", league_code, ".csv")
+      download.file(url, file_path)
+    }
+  }
+
+}
+```
+
+```{r}
+files<-list.files(
+  file.path("..", "data"),
+  pattern = "\\.csv$",
+  full.names = TRUE
+)
+
+data_list<-list()
+
+for(i in seq_along(files)){
+  df<-read.csv(files[i])
+  df<-df[!is.na(df$Date) & df$Date!="", ]
+  file_name<-basename(files[i])
+  
+  df$Season<-substr(
+    file_name,
+    nchar(file_name)-7,
+    nchar(file_name)-4
+  )
+  
+  if(grepl("Premier_League", file_name)){
+    df$League<-"Premier League"
+  }
+  else if(grepl("Championship", file_name)){
+    df$League<-"Championship"
+  }
+  else if(grepl("League_1", file_name)){
+    df$League<-"League 1"
+  }
+  else if(grepl("League_2", file_name)){
+    df$League<-"League 2"
+  }
+  
+  data_list[[i]]<-df
+}
+```
+
+```{r}
+all_columns<-unique(unlist(lapply(data_list, names)))
+data_list<-lapply(data_list, function(df){
+  missing_columns<-setdiff(all_columns, names(df))
+  df[missing_columns]<-NA
+  df<-df[all_columns]
+  return(df)
+})
+
+data<-do.call(rbind, data_list)
+```
+
+
+```{r}
+prop.table(table(data$FTR, data$League), margin = 2)
+```
+
+
+
+
+
