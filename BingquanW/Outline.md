@@ -76,9 +76,11 @@ may also be examined to help interpret the model.
 
 ## Resources
 
-I will identify a Python resource that provides example code for exploratory
-visualisation and/or decision tree classification. I will run the example code
-and adapt it to the football dataset to produce our own analysis and
-visualisations.
+### Football-Data.co.uk
 
-The resources and modifications will be documented as the analysis develops.
+Football-Data.co.uk is used as the main data source for this project. It provides
+historical English football match results, match statistics and betting odds
+across multiple divisions and seasons.
+
+The data from the Premier League, Championship, League One and League Two will
+be used for the exploratory analysis and subsequent modelling.
