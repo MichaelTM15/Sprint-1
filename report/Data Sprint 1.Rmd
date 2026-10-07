@@ -15,14 +15,17 @@ knitr::opts_chunk$set(echo = TRUE)
 # Import
 
 First we automatically import the data for 23 seasons of English football from the top 4 divisions.
-We are pulling all our data from Football-Data.co.uk, a site containing results, match statistics and betting odds
+We are pulling all our data from Football-Data.co.uk, a site containing results, match statistics and betting odds since the 2003/2004 season, and basic stats since the second Premier League season in 1993/94.
 
 ```{r}
+
 if(!dir.exists(file.path("..", "data"))){
   dir.create(file.path("..", "data"))
 }
 
 years<-2003:2025
+
+# Splitting up the leagues
 
 leagues<-c(
   E0 = "Premier_League",
@@ -44,6 +47,8 @@ for(year in years){
     file_name<-paste0(league_name, "_data_", season, ".csv")
     file_path<-file.path("..", "data", file_name)
     
+# Only downloading if not already there
+    
     if(!file.exists(file_path)){
       url<-paste0("https://football-data.co.uk/mmz4281/", season, "/", league_code, ".csv")
       download.file(url, file_path)
@@ -52,6 +57,8 @@ for(year in years){
 
 }
 ```
+
+Next creating a compiled data frame: all 4 leagues across all 23 seasons.
 
 ```{r}
 files<-list.files(
@@ -64,15 +71,21 @@ data_list<-list()
 
 for(i in seq_along(files)){
   df<-read.csv(files[i])
+  
+# This deals with a bug in the data. Some rows of certain seasons had empty strings,
+# which caused additional matches to be added with no information.
   df<-df[!is.na(df$Date) & df$Date!="", ]
+  
   file_name<-basename(files[i])
   
+# This creates a Season variable, by recording it from the file name
   df$Season<-substr(
     file_name,
     nchar(file_name)-7,
     nchar(file_name)-4
   )
   
+# Likewise this creates a League variable
   if(grepl("Premier_League", file_name)){
     df$League<-"Premier League"
   }
@@ -88,9 +101,9 @@ for(i in seq_along(files)){
   
   data_list[[i]]<-df
 }
-```
 
-```{r}
+# This ensures that the dimensions of all the data are the same by creating N/A columns for variables
+# that aren't recorded in certain seasons 
 all_columns<-unique(unlist(lapply(data_list, names)))
 data_list<-lapply(data_list, function(df){
   missing_columns<-setdiff(all_columns, names(df))
@@ -99,9 +112,25 @@ data_list<-lapply(data_list, function(df){
   return(df)
 })
 
+# Creating the data frame
 data<-do.call(rbind, data_list)
 ```
 
+```{r}
+# Export to send for use in Python
+
+write.csv(
+  data,
+  "../data/football_data_halfclean.csv",
+  row.names = FALSE
+)
+```
+
+# Exploratory Data Analysis
+
+We will create some important visualistation of the data to get a broader picture of it.
+Firstly, a table showing how the outcomes H (Home Win), D (Draw), and A (Away Win) are distributed for each 
+league over the 23 seasons:
 
 ```{r}
 prop.table(table(data$FTR, data$League), margin = 2)
