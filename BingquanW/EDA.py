@@ -19,13 +19,26 @@ data_path = (
     / "football_data_halfclean.zip"
 )
 
-df = pd.read_csv(
-    data_path,
-    compression="zip",
-    encoding="latin1",
-    low_memory=False
-)
+import zipfile
 
+# Open the ZIP and select the actual CSV file
+with zipfile.ZipFile(data_path) as z:
+    csv_files = [
+        name for name in z.namelist()
+        if name.lower().endswith(".csv")
+        and not name.startswith("__MACOSX/")
+        and not name.split("/")[-1].startswith("._")
+    ]
+
+    if len(csv_files) != 1:
+        raise ValueError(f"Expected one CSV file, found: {csv_files}")
+
+    with z.open(csv_files[0]) as file:
+        df = pd.read_csv(
+            file,
+            encoding="latin1",
+            low_memory=False
+        )
 # 2. Select the variables needed for this analysis
 plot_data = df[["HST", "AST", "FTR"]].copy()
 
