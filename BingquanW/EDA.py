@@ -92,3 +92,23 @@ plt.show()
 print(
     plot_data.groupby("FTR")["ShotTargetDiff"].describe()
 )
+
+# ==========================================
+# Interpretation of EDA Figure 1
+# ==========================================
+
+# The boxplot shows a positive association between shots-on-target
+# difference (HST - AST) and full-time match results.
+#
+# Home wins (H) have the highest mean shots-on-target difference
+# (approximately 2.55), followed by draws (D) at 0.74.
+# Away wins (A) have a negative mean difference (approximately -1.06).
+#
+# The median shots-on-target difference also increases from
+# away wins to draws and then to home wins.
+#
+# This suggests that shots-on-target difference may be a useful
+# variable for classifying full-time match outcomes.
+#
+# However, the distributions overlap, so this variable alone
+# cannot perfectly distinguish between match results.
