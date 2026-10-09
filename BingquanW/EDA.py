@@ -1,23 +1,27 @@
 # Exploratory Data Analysis
 # This section explores relationships between full-time match statistics
 # and match outcomes in English football.
-
+from pathlib import Path
 import pandas as pd
 import matplotlib.pyplot as plt
-import glob
-import os
-
 # ==============================================
 # Exploratory Data Analysis
 # Shots on Target Difference vs Match Result
 # ==============================================
 
-import pandas as pd
-import matplotlib.pyplot as plt
-
 # 1. Load the half-cleaned dataset
+from pathlib import Path
+
+# Find the ZIP file relative to this Python script
+data_path = (
+    Path(__file__).resolve().parent.parent
+    / "data"
+    / "football_data_halfclean.zip"
+)
+
 df = pd.read_csv(
-    "../data/football_data_halfclean.csv",
+    data_path,
+    compression="zip",
     encoding="latin1",
     low_memory=False
 )
