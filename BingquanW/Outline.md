@@ -17,6 +17,32 @@ the data is cleaned and used for modelling.
 
 ## Planned Exploratory Data Analysis
 
+## Dataset and Current Progress
+
+The dataset was provided by Michael as a partially cleaned
+version of the combined football match data.
+
+It contains historical match statistics from four English
+football leagues:
+
+- Premier League (E0)
+- Championship (E1)
+- League One (E2)
+- League Two (E3)
+
+The original CSV file was too large to upload directly to GitHub,
+so a compressed ZIP version has been uploaded to the `data` folder.
+
+Dataset location:
+`data/football_data_halfclean.zip`
+
+The dataset is suitable for preliminary exploratory data analysis
+(EDA), but further cleaning will be required before training
+the classification model.
+
+My next step is to produce visualisations examining the
+relationships between match statistics and full-time results.
+
 ### 1. Shots on Target Difference and Match Result
 
 Calculate the difference between home and away shots on target:
