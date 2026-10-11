@@ -112,3 +112,76 @@ print(
 #
 # However, the distributions overlap, so this variable alone
 # cannot perfectly distinguish between match results.
+
+# ==========================================
+# EDA Figure 2: Shot Difference vs Match Result
+# ==========================================
+
+# 1. Select the required columns
+shot_data = df[["HS", "AS", "FTR"]].copy()
+
+# 2. Convert shot statistics to numeric values
+shot_data["HS"] = pd.to_numeric(
+    shot_data["HS"], errors="coerce"
+)
+
+shot_data["AS"] = pd.to_numeric(
+    shot_data["AS"], errors="coerce"
+)
+
+# 3. Remove missing values
+shot_data = shot_data.dropna(
+    subset=["HS", "AS", "FTR"]
+)
+
+# Keep only valid match results
+shot_data = shot_data[
+    shot_data["FTR"].isin(["H", "D", "A"])
+].copy()
+
+# 4. Calculate total shot difference
+shot_data["ShotDiff"] = (
+    shot_data["HS"] - shot_data["AS"]
+)
+
+# 5. Create the boxplot
+fig, ax = plt.subplots(figsize=(9, 6))
+
+shot_data.boxplot(
+    column="ShotDiff",
+    by="FTR",
+    ax=ax,
+    grid=False
+)
+
+ax.set_xlabel(
+    "Full-Time Result (A = Away, D = Draw, H = Home)"
+)
+
+ax.set_ylabel(
+    "Home Shots - Away Shots"
+)
+
+ax.set_title(
+    "Shot Difference by Match Result"
+)
+
+plt.suptitle("")
+plt.tight_layout()
+
+# 6. Save the figure in BingquanW
+output_path = (
+    Path(__file__).resolve().parent
+    / "shot_difference_boxplot.png"
+)
+
+plt.savefig(output_path, dpi=300)
+plt.close()
+
+print("\nEDA Figure 2: Shot Difference")
+print("Number of matches:", len(shot_data))
+
+# 7. Print summary statistics
+print(
+    shot_data.groupby("FTR")["ShotDiff"].describe()
+)
