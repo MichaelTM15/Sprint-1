@@ -136,7 +136,37 @@ league over the 23 seasons:
 prop.table(table(data$FTR, data$League), margin = 2)
 ```
 
+Instinctively, it makes sense to remove the closing odds as variables as they are technically created with knowledge of the match outcome. We can also show how closely they interact with the opening odds for each betting site:
+
+```{r}
+par(mfrow=c(2,2))
+
+plot(data$B365H, data$B365CH, xlab = "Bet365 Home Opening Odds", ylab = "Bet365 Home Closing Odds", main = (paste("r=", round(cor(data$B365H, data$B365CH, use = "complete.obs"), 3))))
+plot(data$B365A, data$B365CA, xlab = "Bet365 Away Opening Odds", ylab = "Bet365 Away Closing Odds", main = (paste("r=", round(cor(data$B365A, data$B365CA, use = "complete.obs"), 3))))
+plot(data$B365D, data$B365CD, xlab = "Bet365 Draw Opening Odds", ylab = "Bet365 Draw Closing Odds", main = (paste("r=", round(cor(data$B365D, data$B365CD, use = "complete.obs"), 3))))
 
 
+par(mfrow=c(1,1))
+```
+
+We won't plot the rest of the graphs, but for the bookmakers with opening and closing odds, their correlation is shown in the below table (with N the number of observations this pulls from).
+
+```{r}
+bookmakers<-c("BW", "IW", "WH", "VC", "PS", "BF", "BFE", "BMGM", "BV", "CL", "LB", "X1XB")
+outcomes<-c("H", "D", "A")
+results<-data.frame()
+for (company in bookmakers){
+    for (outcome in outcomes){
+        opening<-paste0(company, outcome)
+        closing<-paste0(company, "C", outcome)
+        valid<-complete.cases(data[, c(opening, closing)])
+        results<-rbind(results, data.frame(
+            Bookmaker=company,
+            Outcome = outcome,
+            Correlation = round(cor(data[[opening]][valid], data[[closing]][valid]), 3), N=sum(valid)
+        ))
+    }
+}
+```
 
 
