@@ -246,3 +246,73 @@ plt.show()
 print(
     corner_data.groupby("FTR")["CornerDiff"].describe()
 )
+
+# ==========================================
+# EDA Figure 4: Home vs Away Shots on Target
+# ==========================================
+
+# 1. Select relevant columns
+scatter_data = df[["FTR", "HST", "AST"]].copy()
+
+# 2. Convert statistics to numeric values
+scatter_data["HST"] = pd.to_numeric(
+    scatter_data["HST"], errors="coerce"
+)
+
+scatter_data["AST"] = pd.to_numeric(
+    scatter_data["AST"], errors="coerce"
+)
+
+# 3. Remove missing values and invalid results
+scatter_data = scatter_data.dropna()
+scatter_data = scatter_data[
+    scatter_data["FTR"].isin(["H", "D", "A"])
+]
+
+# 4. Create scatter plot
+plt.figure(figsize=(9, 6))
+
+colors = {
+    "H": "blue",
+    "D": "green",
+    "A": "red"
+}
+
+labels = {
+    "H": "Home Win",
+    "D": "Draw",
+    "A": "Away Win"
+}
+
+for result in ["H", "D", "A"]:
+    subset = scatter_data[scatter_data["FTR"] == result]
+
+    plt.scatter(
+        subset["HST"],
+        subset["AST"],
+        label=labels[result],
+        color=colors[result],
+        alpha=0.15,
+        s=12
+    )
+
+# 5. Add labels
+plt.xlabel("Home Shots on Target (HST)")
+plt.ylabel("Away Shots on Target (AST)")
+plt.title("Home vs Away Shots on Target by Match Result")
+
+plt.legend()
+plt.grid(alpha=0.2)
+plt.tight_layout()
+
+# 6. Save figure
+plt.savefig(
+    "BingquanW/home_vs_away_shots_on_target.png",
+    dpi=300
+)
+
+plt.show()
+
+# 7. Print number of matches
+print("EDA Figure 4: Home vs Away Shots on Target")
+print("Number of matches:", len(scatter_data))
