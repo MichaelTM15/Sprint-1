@@ -185,3 +185,63 @@ print("Number of matches:", len(shot_data))
 print(
     shot_data.groupby("FTR")["ShotDiff"].describe()
 )
+
+# ==========================================
+# EDA Figure 3
+# Corner Difference vs Match Result
+# ==========================================
+
+# Select relevant variables
+corner_data = df[["HC", "AC", "FTR"]].copy()
+
+# Convert corner statistics to numeric
+corner_data["HC"] = pd.to_numeric(
+    corner_data["HC"], errors="coerce"
+)
+
+corner_data["AC"] = pd.to_numeric(
+    corner_data["AC"], errors="coerce"
+)
+
+# Remove missing values
+corner_data = corner_data.dropna()
+
+# Keep valid match results
+corner_data = corner_data[
+    corner_data["FTR"].isin(["H", "D", "A"])
+].copy()
+
+# Calculate corner difference
+corner_data["CornerDiff"] = (
+    corner_data["HC"] - corner_data["AC"]
+)
+
+# Create boxplot
+fig, ax = plt.subplots(figsize=(9, 6))
+
+corner_data.boxplot(
+    column="CornerDiff",
+    by="FTR",
+    ax=ax,
+    grid=False
+)
+
+ax.set_xlabel("Full-Time Result (A = Away, D = Draw, H = Home)")
+ax.set_ylabel("Home Corners - Away Corners")
+ax.set_title("Corner Difference by Match Result")
+
+plt.suptitle("")
+plt.tight_layout()
+
+# Save figure
+plt.savefig(
+    "BingquanW/corner_difference_boxplot.png",
+    dpi=300
+)
+
+plt.show()
+
+# Print summary statistics
+print(
+    corner_data.groupby("FTR")["CornerDiff"].describe()
+)
