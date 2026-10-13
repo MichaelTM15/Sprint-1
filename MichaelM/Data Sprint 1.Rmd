@@ -169,4 +169,86 @@ for (company in bookmakers){
 }
 ```
 
+```{r}
+results
+```
+
+```{r}
+goal_averages<-aggregate(cbind(FTHG, FTAG) ~ League,
+                         data = data,
+                         FUN=mean,
+                         na.rm=TRUE)
+names(goal_averages)<-c("League", "Average Home Goals", "Average Away Goals")
+goal_averages$`Average H-A Goal Difference`<-goal_averages$`Average Home Goals` - goal_averages$`Average Away Goals`
+goal_averages
+```
+
+```{r}
+par(mfrow=c(1,3))
+league_labels<-c("CH", "L1", "L2", "PL")
+
+barplot(goal_averages$`Average Home Goals`,
+        names.arg = league_labels,
+        main = "Avg HG/Match by League",
+        xlab = "League",
+        ylab = "Average Goals",
+        ylim = c(0, 1.5))
+barplot(goal_averages$`Average Away Goals`,
+        names.arg = league_labels,
+        main = "Avg AG/Match by League",
+        xlab = "League",
+        ylab = "Average Goals",
+        ylim = c(0,1.5))
+barplot(goal_averages$`Average H-A Goal Difference`,
+        names.arg = league_labels,
+        main = "Avg HG-AG Diff/Match by League",
+        xlab = "League",
+        ylab = "Average Goals Difference",
+        ylim = c(0,0.4))
+
+```
+
+```{r}
+seasons<-sort(unique(data$Season))
+season_years<-2003:(2003 + length(seasons) - 1)
+leagues<-unique(data$League)
+
+par(mfrow=c(2,2))
+
+for(league in leagues){
+  league_data<-data[data$League==league, ]
+  proportions<-sapply(seasons, function(s){
+    matches<-league_data[league_data$Season==s, "FTR"]
+    prop.table(table(factor(matches, levels = c("H", "D", "A"))))
+  })
+  matplot(season_years, t(proportions),
+        type="l", lty = 1, lwd=2,
+        col=c("blue", "green", "red"),
+        ylim=c(0,1),
+        main = league,
+        xlab="Season", ylab = "Proportion of Matches")
+  legend("right", legend = c("Home Win", "Draw", "Away Win"),
+       col = c("blue", "green", "red"),
+       lty=1, lwd=2, cex=0.7)
+}
+```
+
+```{r}
+names(data)
+all(is.na(data$X))
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
 
