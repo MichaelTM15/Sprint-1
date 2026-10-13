@@ -1,1 +1,1 @@
-# Can we predict the outcome of a Premier League match from the full time statistics?
+# How well can we classify outcomes from Premier League matches based on models trained on the lower leagues?
