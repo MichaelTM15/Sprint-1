@@ -319,6 +319,10 @@ remove_vars_1<-unique(c(remove_vars_0, odds_to_remove))
 
 
 ```{r}
+remove_vars_1
+```
+
+```{r}
 train_data<-data[
   data$League %in% c("Championship", "League 1", "League 2"), 
   !names(data) %in% remove_vars_1,
