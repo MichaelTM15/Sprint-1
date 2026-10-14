@@ -106,13 +106,31 @@ The selected input features were converted to numeric values.
 
 Rows without valid target labels were excluded.
 
-Missing feature values were handled using median imputation.
+#### Missing Value Analysis
 
-The imputer was fitted using the training data and then
-applied to the testing data.
+The training dataset contained 16 missing values across the
+twelve selected features, representing approximately 0.0035%
+of all training feature values.
 
-This prevents information from the test set from being
-used to calculate the replacement values.
+The missing values were mainly found in the foul-related
+features (HF and AF), with three missing values each.
+The remaining ten features each contained one missing value.
+
+The testing dataset contained no missing values in any
+of the twelve selected features.
+
+#### Missing Value Handling
+
+Missing values were handled using median imputation.
+
+The median values were calculated using only the training
+dataset and then applied to both the training and testing
+datasets. This approach prevents data leakage from the
+testing dataset.
+
+Since the proportion of missing values was extremely small,
+their impact on the overall model performance is expected
+to be limited.
 
 ### 4.2 Random Forest Model
 
