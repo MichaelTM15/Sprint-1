@@ -1,0 +1,374 @@
+---
+title: "Data"
+author: "Michael McDonagh (2392623)"
+date: "2026-10-05"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+## Data 
+
+# Import
+
+First we automatically import the data for 23 seasons of English football from the top 4 divisions.
+We are pulling all our data from Football-Data.co.uk, a site containing results, match statistics and betting odds since the 2003/2004 season, and basic stats since the second Premier League season in 1993/94.
+
+```{r}
+
+if(!dir.exists(file.path("..", "data"))){
+  dir.create(file.path("..", "data"))
+}
+
+years<-2003:2025
+
+# Splitting up the leagues
+
+leagues<-c(
+  E0 = "Premier_League",
+  E1 = "Championship",
+  E2 = "League_1",
+  E3 = "League_2"
+)
+
+for(year in years){
+  season<-paste0(
+    substr(year, 3, 4),
+    sprintf("%02d", (year+1) %% 100)
+  )
+  
+  for(league_code in names(leagues)){
+    league_name<-leagues[[league_code]]
+    
+    
+    file_name<-paste0(league_name, "_data_", season, ".csv")
+    file_path<-file.path("..", "data", file_name)
+    
+# Only downloading if not already there
+    
+    if(!file.exists(file_path)){
+      url<-paste0("https://football-data.co.uk/mmz4281/", season, "/", league_code, ".csv")
+      download.file(url, file_path)
+    }
+  }
+
+}
+```
+
+Next creating a compiled data frame: all 4 leagues across all 23 seasons.
+
+```{r}
+files<-list.files(
+  file.path("..", "data"),
+  pattern = "\\.csv$",
+  full.names = TRUE
+)
+
+data_list<-list()
+
+for(i in seq_along(files)){
+  df<-read.csv(files[i])
+  
+# This deals with a bug in the data. Some rows of certain seasons had empty strings,
+# which caused additional matches to be added with no information.
+  df<-df[!is.na(df$Date) & df$Date!="", ]
+  
+  file_name<-basename(files[i])
+  
+# This creates a Season variable, by recording it from the file name
+  df$Season<-substr(
+    file_name,
+    nchar(file_name)-7,
+    nchar(file_name)-4
+  )
+  
+# Likewise this creates a League variable
+  if(grepl("Premier_League", file_name)){
+    df$League<-"Premier League"
+  }
+  else if(grepl("Championship", file_name)){
+    df$League<-"Championship"
+  }
+  else if(grepl("League_1", file_name)){
+    df$League<-"League 1"
+  }
+  else if(grepl("League_2", file_name)){
+    df$League<-"League 2"
+  }
+  
+  data_list[[i]]<-df
+}
+
+# This ensures that the dimensions of all the data are the same by creating N/A columns for variables
+# that aren't recorded in certain seasons 
+all_columns<-unique(unlist(lapply(data_list, names)))
+data_list<-lapply(data_list, function(df){
+  missing_columns<-setdiff(all_columns, names(df))
+  df[missing_columns]<-NA
+  df<-df[all_columns]
+  return(df)
+})
+
+# Creating the data frame
+data<-do.call(rbind, data_list)
+```
+
+```{r}
+# Export to send for use in Python
+
+write.csv(
+  data,
+  "../data/football_data_halfclean.csv",
+  row.names = FALSE
+)
+```
+
+# Exploratory Data Analysis
+
+We will create some important visualistation of the data to get a broader picture of it.
+Firstly, a table showing how the outcomes H (Home Win), D (Draw), and A (Away Win) are distributed for each 
+league over the 23 seasons:
+
+```{r}
+prop.table(table(data$FTR, data$League), margin = 2)
+```
+
+Instinctively, it makes sense to remove the closing odds as variables as they are technically created with knowledge of the match outcome. We can also show how closely they interact with the opening odds for each betting site:
+
+```{r}
+par(mfrow=c(2,2))
+
+plot(data$B365H, data$B365CH, xlab = "Bet365 Home Opening Odds", ylab = "Bet365 Home Closing Odds", main = (paste("r=", round(cor(data$B365H, data$B365CH, use = "complete.obs"), 3))))
+plot(data$B365A, data$B365CA, xlab = "Bet365 Away Opening Odds", ylab = "Bet365 Away Closing Odds", main = (paste("r=", round(cor(data$B365A, data$B365CA, use = "complete.obs"), 3))))
+plot(data$B365D, data$B365CD, xlab = "Bet365 Draw Opening Odds", ylab = "Bet365 Draw Closing Odds", main = (paste("r=", round(cor(data$B365D, data$B365CD, use = "complete.obs"), 3))))
+
+
+par(mfrow=c(1,1))
+```
+
+We won't plot the rest of the graphs, but for the bookmakers with opening and closing odds, their correlation is shown in the below table (with N the number of observations this pulls from).
+
+```{r}
+bookmakers<-c("B365", "BW", "IW", "WH", "VC", "PS", "BF", "BFD", "BFE", "BMGM", "BV", "CL", "LB", "X1XB")
+outcomes<-c("H", "D", "A")
+results<-data.frame()
+for (company in bookmakers){
+    for (outcome in outcomes){
+        opening<-paste0(company, outcome)
+        closing<-paste0(company, "C", outcome)
+        valid<-complete.cases(data[, c(opening, closing)])
+        results<-rbind(results, data.frame(
+            Bookmaker=company,
+            Outcome = outcome,
+            Correlation = round(cor(data[[opening]][valid], data[[closing]][valid]), 3), N=sum(valid)
+        ))
+    }
+}
+
+bookmakers_AH<-c("B365", "P", "BFE")
+outcomes_AH<-c("H", "A")
+results_AH<-data.frame()
+for (company in bookmakers_AH){
+    for (outcomeAH in outcomes_AH){
+        opening<-paste0(company, "AH", outcome)
+        closing<-paste0(company, "CAH", outcome)
+        valid<-complete.cases(data[, c(opening, closing)])
+        results_AH<-rbind(results_AH, data.frame(
+            Bookmaker=company,
+            Outcome = outcomeAH,
+            Correlation = round(cor(data[[opening]][valid], data[[closing]][valid]), 3), N=sum(valid)
+        ))
+    }
+}
+
+
+bookmakers_25O<-c("B365", "BFE")
+results_25O<-data.frame()
+for (company in bookmakers_25O){
+  opening<-paste0(company, ".2.5")
+  closing<-paste0(company, "C.2.5")
+  valid<-complete.cases(data[, c(opening, closing)])
+  results_25O<-rbind(results_25O, data.frame(
+    Bookmaker=company,
+    Outcome = "Over 2.5",
+    Correlation = round(cor(data[[opening]][valid], data[[closing]][valid]), 3), N=sum(valid)
+  ))
+}
+
+
+bookmakers_25U<-c("B365", "BFE")
+results_25U<-data.frame()
+for (company in bookmakers_25U){
+  opening<-paste0(company, ".2.5.1")
+  closing<-paste0(company, "C.2.5.1")
+  valid<-complete.cases(data[, c(opening, closing)])
+  results_25U<-rbind(results_25U, data.frame(
+    Bookmaker=company,
+    Outcome = "Under 2.5",
+    Correlation = round(cor(data[[opening]][valid], data[[closing]][valid]), 3), N=sum(valid)
+    ))
+}
+
+results$Market<-"1X2"
+results_AH$Market<-"Asian Handicap"
+results_25O$Market<-"Over/Under 2.5"
+results_25U$Market<-"Over/Under 2.5"
+all_results<-rbind(results, results_AH, results_25O, results_25U)
+all_results<-all_results[, c("Market", "Bookmaker", "Outcome", "Correlation", "N")]
+all_results
+```
+
+```{r}
+plot(
+  data$B365AHH[valid],data$B365CAHH[valid],
+  xlab = "Opening Asian Handicap Home Odds",
+  ylab = "Closing Asian Handicap Home Odds",
+  main = "Bet365 Asian Handicap Odds"
+)
+
+abline(
+  lm(data$B365CAHH[valid] ~ data$B365AHH[valid]),
+  col = "purple",
+  lwd = 2
+)
+```
+
+```{r}
+goal_averages<-aggregate(cbind(FTHG, FTAG) ~ League,
+                         data = data,
+                         FUN=mean,
+                         na.rm=TRUE)
+names(goal_averages)<-c("League", "Average Home Goals", "Average Away Goals")
+goal_averages$`Average H-A Goal Difference`<-goal_averages$`Average Home Goals` - goal_averages$`Average Away Goals`
+goal_averages
+```
+
+```{r}
+par(mfrow=c(1,3))
+league_labels<-c("CH", "L1", "L2", "PL")
+
+barplot(goal_averages$`Average Home Goals`,
+        names.arg = league_labels,
+        main = "Avg HG/Match by League",
+        xlab = "League",
+        ylab = "Average Goals",
+        ylim = c(0, 1.5))
+barplot(goal_averages$`Average Away Goals`,
+        names.arg = league_labels,
+        main = "Avg AG/Match by League",
+        xlab = "League",
+        ylab = "Average Goals",
+        ylim = c(0,1.5))
+barplot(goal_averages$`Average H-A Goal Difference`,
+        names.arg = league_labels,
+        main = "Avg HG-AG Diff/Match by League",
+        xlab = "League",
+        ylab = "Average Goals Difference",
+        ylim = c(0,0.4))
+
+```
+
+```{r}
+seasons<-sort(unique(data$Season))
+season_years<-2003:(2003 + length(seasons) - 1)
+leagues<-unique(data$League)
+
+par(mfrow=c(2,2))
+
+for(league in leagues){
+  league_data<-data[data$League==league, ]
+  proportions<-sapply(seasons, function(s){
+    matches<-league_data[league_data$Season==s, "FTR"]
+    prop.table(table(factor(matches, levels = c("H", "D", "A"))))
+  })
+  matplot(season_years, t(proportions),
+        type="l", lty = 1, lwd=2,
+        col=c("blue", "green", "red"),
+        ylim=c(0,1),
+        main = league,
+        xlab="Season", ylab = "Proportion of Matches")
+  legend("right", legend = c("Home Win", "Draw", "Away Win"),
+       col = c("blue", "green", "red"),
+       lty=1, lwd=2, cex=0.7)
+}
+```
+
+
+
+```{r}
+remove_vars_0<-c(
+  "Div", "Date", "HomeTeam", "AwayTeam", "Referee", "Time", "Date", "X", "Season", "League",
+  "FTHG", "FTAG", "HTAG", "HTHG", "HTR"
+)
+
+closing_odds<-grep("C(H|D|A)$|C\\.|CAH|AHCh", names(data), value=TRUE)
+max_avg_odds<-grep("^(Max|Avg|BbMx|BbAv)", names(data), value=TRUE)
+bookmaker_counts<-grep("^Bb(1X2|OU|AH)$", names(data), value=TRUE)
+odds_to_remove<-unique(c(closing_odds, max_avg_odds, bookmaker_counts))
+
+remove_vars_1<-unique(c(remove_vars_0, odds_to_remove))
+
+```
+
+
+```{r}
+train_data<-data[
+  data$League %in% c("Championship", "League 1", "League 2"), 
+  !names(data) %in% remove_vars_1,
+  drop = FALSE
+]
+
+test_data<-data[
+  data$League %in% c("Premier League"), 
+  !names(data) %in% remove_vars_1,
+  drop = FALSE
+]
+```
+
+```{r}
+make_heatmap<-function(dataset, plot_title){
+  numeric_data<-dataset[, sapply(dataset, is.numeric), drop = FALSE]
+  usable<-sapply(numeric_data, function(x){
+    sum(!is.na(x))>=2 && length(unique(x[!is.na(x)]))>1
+  })
+  numeric_data<-numeric_data[, usable, drop = FALSE]
+  correlations<-cor(numeric_data, use="pairwise.complete.obs")
+  
+  heatmap_colours<-colorRampPalette(c("yellow", "orange", "red"))(100)
+  heatmap(correlations, symm=TRUE, scale="none", col=heatmap_colours,
+          breaks=seq(-1,1,length.out=101), main=plot_title)
+  legend("topright", legend=c("Negative (-1)", "Zero (0)", "Positive (+1)"),
+         fill=c("yellow", "orange", "red"), cex=0.7, bty="n")
+}
+
+```
+
+```{r}
+make_heatmap(train_data, "Training Data Predictor Heatmap")
+```
+
+```{r}
+make_heatmap(test_data, "Test Data Predictor Heatmap")
+```
+
+```{r}
+write.csv(
+  train_data,
+  "../data/football_train_data.csv",
+  row.names = FALSE
+  )
+
+write.csv(
+  test_data,
+  "../data/football_test_data.csv",
+  row.names = FALSE
+  )
+```
+
+
+
+
+

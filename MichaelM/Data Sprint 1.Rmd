@@ -1,5 +1,5 @@
 ---
-title: "Data"
+title: "EDA Sprint 1"
 author: "Michael McDonagh (2392623)"
 date: "2026-10-05"
 output: pdf_document
