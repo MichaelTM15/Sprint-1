@@ -152,7 +152,7 @@ par(mfrow=c(1,1))
 We won't plot the rest of the graphs, but for the bookmakers with opening and closing odds, their correlation is shown in the below table (with N the number of observations this pulls from).
 
 ```{r}
-bookmakers<-c("BW", "IW", "WH", "VC", "PS", "BF", "BFE", "BMGM", "BV", "CL", "LB", "X1XB")
+bookmakers<-c("B365", "BW", "IW", "WH", "VC", "PS", "BF", "BFD", "BFE", "BMGM", "BV", "CL", "LB", "X1XB")
 outcomes<-c("H", "D", "A")
 results<-data.frame()
 for (company in bookmakers){
@@ -167,10 +167,73 @@ for (company in bookmakers){
         ))
     }
 }
+
+bookmakers_AH<-c("B365", "P", "BFE")
+outcomes_AH<-c("H", "A")
+results_AH<-data.frame()
+for (company in bookmakers_AH){
+    for (outcomeAH in outcomes_AH){
+        opening<-paste0(company, "AH", outcome)
+        closing<-paste0(company, "CAH", outcome)
+        valid<-complete.cases(data[, c(opening, closing)])
+        results_AH<-rbind(results_AH, data.frame(
+            Bookmaker=company,
+            Outcome = outcomeAH,
+            Correlation = round(cor(data[[opening]][valid], data[[closing]][valid]), 3), N=sum(valid)
+        ))
+    }
+}
+
+
+bookmakers_25O<-c("B365", "BFE")
+results_25O<-data.frame()
+for (company in bookmakers_25O){
+  opening<-paste0(company, ".2.5")
+  closing<-paste0(company, "C.2.5")
+  valid<-complete.cases(data[, c(opening, closing)])
+  results_25O<-rbind(results_25O, data.frame(
+    Bookmaker=company,
+    Outcome = "Over 2.5",
+    Correlation = round(cor(data[[opening]][valid], data[[closing]][valid]), 3), N=sum(valid)
+  ))
+}
+
+
+bookmakers_25U<-c("B365", "BFE")
+results_25U<-data.frame()
+for (company in bookmakers_25U){
+  opening<-paste0(company, ".2.5.1")
+  closing<-paste0(company, "C.2.5.1")
+  valid<-complete.cases(data[, c(opening, closing)])
+  results_25U<-rbind(results_25U, data.frame(
+    Bookmaker=company,
+    Outcome = "Under 2.5",
+    Correlation = round(cor(data[[opening]][valid], data[[closing]][valid]), 3), N=sum(valid)
+    ))
+}
+
+results$Market<-"1X2"
+results_AH$Market<-"Asian Handicap"
+results_25O$Market<-"Over/Under 2.5"
+results_25U$Market<-"Over/Under 2.5"
+all_results<-rbind(results, results_AH, results_25O, results_25U)
+all_results<-all_results[, c("Market", "Bookmaker", "Outcome", "Correlation", "N")]
+all_results
 ```
 
 ```{r}
-results
+plot(
+  data$B365AHH[valid],data$B365CAHH[valid],
+  xlab = "Opening Asian Handicap Home Odds",
+  ylab = "Closing Asian Handicap Home Odds",
+  main = "Bet365 Asian Handicap Odds"
+)
+
+abline(
+  lm(data$B365CAHH[valid] ~ data$B365AHH[valid]),
+  col = "purple",
+  lwd = 2
+)
 ```
 
 ```{r}
@@ -233,20 +296,77 @@ for(league in leagues){
 }
 ```
 
+
+
 ```{r}
-names(data)
-all(is.na(data$X))
+remove_vars_0<-c(
+  "Div", "Date", "HomeTeam", "AwayTeam", "Referee", "Time", "Date", "X", "Season", "League",
+  "FTHG", "FTAG", "HTAG", "HTHG", "HTR"
+)
+
+closing_odds<-grep("C(H|D|A)$|C\\.|CAH|AHCh", names(data), value=TRUE)
+max_avg_odds<-grep("^(Max|Avg|BbMx|BbAv)", names(data), value=TRUE)
+bookmaker_counts<-grep("^Bb(1X2|OU|AH)$", names(data), value=TRUE)
+odds_to_remove<-unique(c(closing_odds, max_avg_odds, bookmaker_counts))
+
+remove_vars_1<-unique(c(remove_vars_0, odds_to_remove))
 
 ```
 
 
+```{r}
+train_data<-data[
+  data$League %in% c("Championship", "League 1", "League 2"), 
+  !names(data) %in% remove_vars_1,
+  drop = FALSE
+]
 
+test_data<-data[
+  data$League %in% c("Premier League"), 
+  !names(data) %in% remove_vars_1,
+  drop = FALSE
+]
+```
 
+```{r}
+make_heatmap<-function(dataset, plot_title){
+  numeric_data<-dataset[, sapply(dataset, is.numeric), drop = FALSE]
+  usable<-sapply(numeric_data, function(x){
+    sum(!is.na(x))>=2 && length(unique(x[!is.na(x)]))>1
+  })
+  numeric_data<-numeric_data[, usable, drop = FALSE]
+  correlations<-cor(numeric_data, use="pairwise.complete.obs")
+  
+  heatmap_colours<-colorRampPalette(c("yellow", "orange", "red"))(100)
+  heatmap(correlations, symm=TRUE, scale="none", col=heatmap_colours,
+          breaks=seq(-1,1,length.out=101), main=plot_title)
+  legend("topright", legend=c("Negative (-1)", "Zero (0)", "Positive (+1)"),
+         fill=c("yellow", "orange", "red"), cex=0.7, bty="n")
+}
 
+```
 
+```{r}
+make_heatmap(train_data, "Training Data Predictor Heatmap")
+```
 
+```{r}
+make_heatmap(test_data, "Test Data Predictor Heatmap")
+```
 
+```{r}
+write.csv(
+  train_data,
+  "../data/football_train_data.csv",
+  row.names = FALSE
+  )
 
+write.csv(
+  test_data,
+  "../data/football_test_data.csv",
+  row.names = FALSE
+  )
+```
 
 
 
