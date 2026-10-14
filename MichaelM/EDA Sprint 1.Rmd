@@ -137,7 +137,28 @@ Firstly, a table showing how the outcomes H (Home Win), D (Draw), and A (Away Wi
 league over the 23 seasons:
 
 ```{r}
-prop.table(table(data$FTR, data$League), margin = 2)
+results_proportions<-prop.table(table(data$FTR, data$League), margin = 2)
+```
+
+```{r}
+results_proportions
+```
+
+```{r}
+barplot(
+  results_proportions[c("H","D","A"), ],
+  beside = FALSE,
+  col=c("darkblue", "grey", "darkred"),
+  ylim=c(0,1),
+  main="Match Outcome Proportions by League",
+  xlab = "League",
+  ylab="Proporion of Matches"
+)
+legend("topright",
+       legend = c("Home Win", "Draw", "Away Win"),
+       fill=c("darkblue", "grey", "darkred"),
+       cex=0.8)
+
 ```
 
 Instinctively, it makes sense to remove the closing odds as variables as they are technically created with knowledge of the match outcome. We can also show how closely they interact with the opening odds for each betting site:
@@ -247,6 +268,9 @@ goal_averages<-aggregate(cbind(FTHG, FTAG) ~ League,
                          na.rm=TRUE)
 names(goal_averages)<-c("League", "Average Home Goals", "Average Away Goals")
 goal_averages$`Average H-A Goal Difference`<-goal_averages$`Average Home Goals` - goal_averages$`Average Away Goals`
+```
+
+```{r}
 goal_averages
 ```
 
