@@ -51,7 +51,11 @@ for(year in years){
     
     if(!file.exists(file_path)){
       url<-paste0("https://football-data.co.uk/mmz4281/", season, "/", league_code, ".csv")
+      message("Downloading", file_name)
       download.file(url, file_path)
+    }
+    else{
+      message("Already exists, skipping", file_name)
     }
   }
 
@@ -121,7 +125,7 @@ data<-do.call(rbind, data_list)
 
 write.csv(
   data,
-  "../data/football_data_halfclean.csv",
+  "../processed-data/football_data_halfclean.csv",
   row.names = FALSE
 )
 ```
@@ -357,13 +361,13 @@ make_heatmap(test_data, "Test Data Predictor Heatmap")
 ```{r}
 write.csv(
   train_data,
-  "../data/football_train_data.csv",
+  "../processed-data/football_train_data.csv",
   row.names = FALSE
   )
 
 write.csv(
   test_data,
-  "../data/football_test_data.csv",
+  "../processed-data/football_test_data.csv",
   row.names = FALSE
   )
 ```
