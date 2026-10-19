@@ -7,7 +7,7 @@ output: pdf_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
+setwd("~/GitHub/Sprint-0/MichaelM")
 ```
 
 
