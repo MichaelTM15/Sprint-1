@@ -112,6 +112,48 @@ Accuracy<-mean(svm_predictions1==test_data$FTR)
 Accuracy
 ```
 
-So 
+So we have an accuracy of 57.5% which is quite bad. It didn't seem to predict many draws at all.
+In fact we can do:
+
+```{r}
+round(diag(prop.table(confusion_matrix_NB, margin=1))*100, 2)
+```
+
+to see the percentage of correctly classified outcomes for each of Home Win, Draw and Away Win.
+As we can see the model had a lot of trouble getting the draws, but seemed good at Home Wins and reasonable for
+Away wins.
+
+We will see how much of a difference knowing the bookmakers opening odds (specifically Bet365) can help it.
+Setting up the dataset with the predictors:
+
+```{r}
+train_data_B<-train_data_NB[complete.cases(train_data_NB[, c("B365H", "B365D", "B365A")]),]
+selected_predictors_B<-unique(c(selected_predictors, "B365H", "B365D", "B365A"))
+```
+
+and fitting the model:
+
+```{r}
+svm_model_B<-svm(FTR~., data=train_data_B[, c("FTR", selected_predictors_B)],
+                 kernel="radial", cost=1, gamma=1/length(selected_predictors_B), scale=TRUE)
+```
+
+Now checking the performance:
+
+```{r}
+svm_predictions_B<-predict(svm_model_B, newdata=test_data[, selected_predictors_B, drop=FALSE])
+confusion_matrix_B<-table(Actual=test_data$FTR, Predicted=svm_predictions_B)
+```
+
+```{r}
+confusion_matrix_B
+Accuracy_B<-mean(svm_predictions_B==test_data$FTR)
+Accuracy_B
+```
+```{r}
+round(diag(prop.table(confusion_matrix_B, margin=1))*100, 2)
+```
+This is a slight improvement for all outcomes.
+
 
 
