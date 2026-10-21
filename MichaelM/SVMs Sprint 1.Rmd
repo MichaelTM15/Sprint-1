@@ -154,6 +154,23 @@ Accuracy_B
 round(diag(prop.table(confusion_matrix_B, margin=1))*100, 2)
 ```
 This is a slight improvement for all outcomes.
+We continue by trying to maximize the performance of the Non-Betting SVM by using K-fold CV
+
+```{r}
+# Initializing with a given seed in order to be repeatable
+
+set.seed(123)
+svm_tuning_NB<-tune(svm, FTR~., data=train_data_NB[, c("FTR", selected_predictors)],
+                        kernel="radial", ranges=list(cost=2^(-1:5), gamma=2^(-5:1)),
+                        tunecontrol=tune.control(cross=5))
+```
+
+```{r}
+svm_tuning_NB$best.parameters
+svm_tuning_NB$best.performance
+```
+
+
 
 
 
