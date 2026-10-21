@@ -10,10 +10,106 @@ knitr::opts_chunk$set(echo = TRUE)
 setwd("~/GitHub/Sprint-0/MichaelM")
 ```
 
+Importing the data:
+
 ```{r}
 library(e1071)
 
 train_data<-read.csv("../processed-data/football_train_data.csv")
 test_data<-read.csv("../processed-data/football_test_data.csv")
+```
+
+Pre-processing:
+
+```{r}
+# Making outcome into a factor variable:
+
+train_data$FTR<-factor(train_data$FTR, levels=c("H", "D", "A"))
+test_data$FTR<-factor(test_data$FTR, levels=c("H", "D", "A"))
+
+
+# Pulling out the predictor variables from the outcome
+predictors<-setdiff(names(train_data), "FTR")
+
+selected_predictors <- predictors[
+    colSums(is.na(train_data[, predictors, drop = FALSE])) == 0
+]
+```
+
+That seems to be a problem - all predictors have at least one row with missing values
+
+```{r}
+which(is.na(train_data$AST))
+train_complete<-train_data[-8808,]
+```
+
+I personally inspected this in the Excel file, it had N/A for almost all of the match statistics weirdly.
+So removing it for now.
+Trying again:
+
+```{r}
+sum(colSums(is.na(train_complete[, predictors, drop = FALSE])) == 0)
+```
+
+Only 10 - I would have thought 12; all the match statistics (non-betting odds)
+Looking at which were fine:
+
+```{r}
+selected_predictors1 <- predictors[
+    colSums(is.na(train_complete[, predictors, drop = FALSE])) == 0
+]
+selected_predictors1
+```
+
+AF and HF are the only two missing. Investigating:
+
+```{r}
+which(is.na(train_data$AF))
+which(is.na(train_data$HF))
+```
+
+So now we'll use:
+
+```{r}
+train_data<-train_data[-c(8808,32940,32949),]
+selected_predictors <- predictors[
+    colSums(is.na(train_data[, predictors, drop = FALSE])) == 0
+]
+```
+
+which should work:
+
+```{r}
+sum(colSums(is.na(train_data[, predictors, drop = FALSE])) == 0)
+selected_predictors
+```
+
+
+
+
+
+
+```{r}
+nrow(train_data)
+nrow(test_data)
+```
+
+```{r}
+
+
+#train_complete<-train_data[complete.cases(train_data[, c("FTR", predictors)]), 
+#                           c("FTR", predictors)]
+
+#test_complete<-test_data[complete.cases(test_data[, c("FTR", predictors)]), 
+#                           c("FTR", predictors)]
+```
+
+```{r}
+#nrow(train_complete)
+#nrow(test_complete)
+```
+
+```{r}
+#svm_model<-svm(FTR~., data=train_data, kernel="radial", cost=1, gamma=1/length(predictors), scale=TRUE)
 
 ```
