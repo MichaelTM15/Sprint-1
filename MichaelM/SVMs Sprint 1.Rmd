@@ -163,11 +163,28 @@ set.seed(123)
 svm_tuning_NB<-tune(svm, FTR~., data=train_data_NB[, c("FTR", selected_predictors)],
                         kernel="radial", ranges=list(cost=2^(-1:5), gamma=2^(-5:1)),
                         tunecontrol=tune.control(cross=5))
+
+svm_tuning_B<-tune(svm, FTR~., data=train_data_B[, c("FTR", selected_predictors_B)],
+                        kernel="radial", ranges=list(cost=2^(-1:5), gamma=2^(-5:1)),
+                        tunecontrol=tune.control(cross=5))
 ```
 
 ```{r}
-svm_tuning_NB$best.parameters
-svm_tuning_NB$best.performance
+best_parameters_NB<-svm_tuning_NB$best.parameters
+best_parameters_B<-svm_tuning_B$best.parameters
+
+best_svm_NB<-svm_tuning_NB$best.model
+best_svm_B<-svm_tuning_B$best.model
+
+saveRDS(list(
+  best_svm_B=best_svm_B,
+  best_svm_NB=best_svm_NB,
+  best_parameters_B=best_parameters_B,
+  best_parameters_NB=best_parameters_NB,
+  svm_tuning_B=svm_tuning_B,
+  svm_tuning_NB=svm_tuning_NB
+  ), 
+  "../MichaelM/best_svm_models.rds")
 ```
 
 
