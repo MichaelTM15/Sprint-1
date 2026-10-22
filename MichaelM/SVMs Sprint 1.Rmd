@@ -187,6 +187,55 @@ saveRDS(list(
   "../MichaelM/best_svm_models.rds")
 ```
 
+Investigating missingness for other variables:
+
+```{r}
+odds_var<-setdiff(names(train_data), selected_predictors_B)
+
+missingness <- data.frame(
+  Variable = odds_var,
+  Missing_N = sapply(train_data[odds_var], function(x) sum(is.na(x))),
+  Missing_Percent = sapply(
+    train_data[odds_var],
+    function(x) mean(is.na(x)) * 100
+  )
+)
+
+missingness <- missingness[
+  order(-missingness$Missing_Percent),
+]
+```
+
+Checking the table:
+
+```{r}
+missingness
+```
+
+It seems that a few of the betting odds have relatively low missingness.
+We will work with the 3 sites at under 12%
+Imputing:
+
+```{r}
+library(mice)
+
+impute_vars <- c(
+  "BWA", "BWD", "BWH",
+  "WHA", "WHD", "WHH",
+  "IWH", "IWD", "IWA"
+)
+```
+
+
+
+
+
+
+
+
+
+
+
 
 
 
