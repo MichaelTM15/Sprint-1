@@ -1,401 +1,321 @@
-# Random Forest Classification Report
+# Random Forest Model Report
 
 ## 1. Introduction
 
-The aim of this project is to investigate whether full-time
-football match statistics can be used to classify match outcomes.
+The aim of this project is to investigate whether the outcome of an English football match can be classified using full-time match statistics. The target variable is **FTR (Full-Time Result)**, which has three possible outcomes:
 
-The research question is:
+- **H:** Home win
+- **D:** Draw
+- **A:** Away win
 
-**Can we predict the outcome of a Premier League match from the full-time statistics?**
+A Random Forest classifier was selected because it combines multiple decision trees and can capture complex, non-linear relationships between match statistics.
 
-A Random Forest classifier was developed to classify football
-matches into three possible outcomes:
-
-- H: Home Win
-- D: Draw
-- A: Away Win
-
-Random Forest was selected because it combines multiple decision
-trees and can capture complex relationships between different
-match statistics.
-
-This report presents the model development process, evaluation
-results, feature importance, and limitations.
+This report describes the dataset, exploratory analysis, missing-data treatment, model development, evaluation results, feature importance, and limitations.
 
 ## 2. Dataset
 
-The dataset contains historical English football match statistics
-obtained from Football-Data.co.uk.
+The dataset contains historical English football match statistics obtained from Football-Data.co.uk.
 
-The project includes data from four English football divisions:
+The overall project includes data from four English football divisions:
 
 - Premier League
 - Championship
 - League One
 - League Two
 
-The processed training and testing datasets were provided by
-a group member and stored in the GitHub repository.
+The processed training and testing datasets were provided by a group member and stored in the GitHub repository.
 
 The following files were used:
 
 - `processed-data/football_train_data.csv`
 - `processed-data/football_test_data.csv`
 
-The datasets contain:
-
 | Dataset | Number of Matches |
-|---------|------------------:|
-| Training Dataset | 37,824 |
-| Testing Dataset | 8,740 |
+|---|---:|
+| Training dataset | 37,824 |
+| Testing dataset | 8,740 |
 | Total | 46,564 |
 
-The training and testing datasets were used as provided,
-without creating an additional random split.
+The existing training and testing datasets were used without creating an additional random split.
 
-The target variable was `FTR`, representing the full-time result.
+### 2.1 Selected Features
 
-## 3. Feature Selection
-
-Twelve full-time match statistics were selected as input features.
+The Random Forest model used 12 numerical predictors representing full-time match statistics.
 
 | Feature | Description |
-|---------|-------------|
-| HS | Home Team Shots |
-| AS | Away Team Shots |
-| HST | Home Team Shots on Target |
-| AST | Away Team Shots on Target |
-| HF | Home Team Fouls |
-| AF | Away Team Fouls |
-| HC | Home Team Corners |
-| AC | Away Team Corners |
-| HY | Home Team Yellow Cards |
-| AY | Away Team Yellow Cards |
-| HR | Home Team Red Cards |
-| AR | Away Team Red Cards |
+|---|---|
+| HS | Home team shots |
+| AS | Away team shots |
+| HST | Home team shots on target |
+| AST | Away team shots on target |
+| HF | Home team fouls |
+| AF | Away team fouls |
+| HC | Home team corners |
+| AC | Away team corners |
+| HY | Home team yellow cards |
+| AY | Away team yellow cards |
+| HR | Home team red cards |
+| AR | Away team red cards |
 
-These variables describe attacking performance, fouls,
-corners, and disciplinary statistics.
+Betting odds were excluded from the model because they contained substantial missing data and were not necessary for the selected modelling approach.
 
-The target variable `FTR` was excluded from the input features.
+Full-time home and away goals (FTHG and FTAG) were also excluded because they directly determine the match result. Including these variables would cause target leakage and make the prediction task trivial.
 
-Full-time goals (`FTHG` and `FTAG`) were also excluded because
-they directly determine the final match result.
+## 3. Exploratory Data Analysis
 
-Including these variables would introduce target leakage.
+Exploratory Data Analysis (EDA) was conducted to understand the relationships between match statistics and football match outcomes.
 
-Betting odds were not included because this model focuses
-on the relationship between match statistics and outcomes.
+The analysis examined shots on target, shot differences, corner differences, and home-versus-away attacking performance.
 
-## 4. Methodology
+The visualisations were used to explore potential relationships between these statistics and the full-time result.
 
-### 4.1 Data Preprocessing
+These findings helped identify relevant numerical predictors for the Random Forest classifier.
 
-Python was used to develop the Random Forest model.
+## 4. Data Preprocessing and Missing-Data Analysis
 
-The main libraries were:
+### 4.1 Identifying Missing Values
 
-- pandas
-- matplotlib
-- scikit-learn
+Before training the model, the selected numerical predictors were checked for missing values.
 
-The training and testing datasets were loaded using pandas.
+The training dataset contained 16 missing feature values distributed across three observations. Specifically, the home and away foul variables each contained three missing values, while each of the other ten selected features contained one missing value.
 
-The selected input features were converted to numeric values.
+No missing values were identified in the 12 selected predictors in the test dataset.
 
-Rows without valid target labels were excluded.
+Because the number of affected observations was very small relative to the training dataset, several missing-data handling methods were compared to determine whether the choice of method influenced model performance.
 
-#### Missing Value Analysis
+### 4.2 Missing-Data Handling Methods
 
-The training dataset contained 16 missing values across the
-twelve selected features, representing approximately 0.0035%
-of all training feature values.
+Four approaches were evaluated using the Random Forest classifier.
 
-The missing values were mainly found in the foul-related
-features (HF and AF), with three missing values each.
-The remaining ten features each contained one missing value.
+**Method 1: Complete-case Analysis**
 
-The testing dataset contained no missing values in any
-of the twelve selected features.
+Complete-case analysis removes observations containing missing values in the required predictor variables.
 
-#### Missing Value Handling
+In this project, three incomplete training observations were removed, reducing the training dataset from 37,824 to 37,821 matches.
 
-Missing values were handled using median imputation.
+This method avoids introducing estimated values but may cause bias if the missingness mechanism is not completely at random.
 
-The median values were calculated using only the training
-dataset and then applied to both the training and testing
-datasets. This approach prevents data leakage from the
-testing dataset.
+**Method 2: Simple Imputation (Mean)**
 
-Since the proportion of missing values was extremely small,
-their impact on the overall model performance is expected
-to be limited.
+Simple imputation replaces missing numerical values with the mean of the corresponding feature calculated from the training data.
 
-### 4.2 Random Forest Model
+This method retains all training observations and is computationally efficient. However, it does not account for relationships between variables or uncertainty in the missing values.
 
-A Random Forest classifier was implemented using scikit-learn.
+**Method 3: Regression Imputation**
 
-The model parameters were:
+Regression imputation estimates missing values using information from other observed predictors.
+
+This approach can account for relationships between variables and may produce more informed estimates than simple mean imputation.
+
+However, its effectiveness depends on the assumptions and predictive accuracy of the imputation model.
+
+**Method 4: Multiple Imputation**
+
+Multiple imputation generates several completed datasets by estimating missing values multiple times.
+
+In this experiment, five imputations were performed, and the resulting Random Forest predictions were combined.
+
+This approach reflects uncertainty in the missing values more explicitly than single imputation, but it requires additional computational resources.
+
+All four approaches used the training data for their respective missing-data treatments. The original test dataset was retained for evaluation.
+
+### 4.3 Comparison of Missing-Data Methods
+
+The following results were obtained from the four Random Forest experiments.
+
+| Method | Accuracy | Macro F1 | Draw Recall |
+|---|---:|---:|---:|
+| **Complete-case Analysis** | **57.21%** | **45.76%** | 6.21% |
+| Simple Imputation (Mean) | 56.97% | 45.57% | **6.25%** |
+| Regression Imputation | 56.99% | 45.54% | 6.07% |
+| Multiple Imputation | 57.16% | 45.61% | 5.93% |
+
+Complete-case analysis achieved the highest overall accuracy and Macro F1-score among the four methods.
+
+Mean imputation achieved a slightly higher recall for drawn matches, although the difference was very small.
+
+Multiple imputation produced results close to those of complete-case analysis, while regression imputation and mean imputation achieved slightly lower overall accuracy.
+
+The difference between the highest and lowest accuracy was only 0.24 percentage points.
+
+These results suggest that the choice of missing-data treatment had a relatively small influence on Random Forest performance in this experiment.
+
+### 4.4 Selection of the Final Method
+
+Complete-case analysis was selected for the final Random Forest model for three reasons.
+
+First, it achieved the highest accuracy and Macro F1-score in the comparison.
+
+Second, only three observations needed to be removed from a training dataset containing 37,824 matches, resulting in a negligible reduction in sample size.
+
+Third, it avoided introducing estimated feature values and was simpler to implement and interpret than regression or multiple imputation.
+
+However, the small performance differences do not establish that complete-case analysis is universally superior. The comparison is specific to this dataset and model configuration.
+
+The final Random Forest model therefore used 37,821 complete training observations and the original 8,740 test observations.
+
+## 5. Random Forest Model Development
+
+### 5.1 Model Configuration
+
+A Random Forest classifier was implemented using Python and scikit-learn.
+
+The model used the following hyperparameters:
 
 | Parameter | Value |
-|-----------|-------|
-| Number of Trees | 200 |
-| Maximum Tree Depth | 12 |
-| Random State | 42 |
-| Parallel Processing | n_jobs=-1 |
+|---|---|
+| Model | RandomForestClassifier |
+| Number of trees (`n_estimators`) | 200 |
+| Maximum tree depth (`max_depth`) | 12 |
+| Random state | 42 |
+| Parallel processing (`n_jobs`) | -1 |
 
-Random Forest combines predictions from multiple decision trees.
+The model was trained using the 12 selected match statistics to classify the full-time result into home win, draw, or away win.
 
-Each tree learns patterns from the training data, and the
-final classification is determined by the ensemble.
+The random state was fixed to improve reproducibility.
 
-The model was trained using the training dataset and evaluated
-on the separate testing dataset.
+### 5.2 Training and Testing
 
-The implementation is available in
-[RandomForest.py](RandomForest.py).
+The model was trained using the complete-case training dataset.
 
-## 5. Model Evaluation
+Predictions were then generated for the existing test dataset.
 
-### 5.1 Accuracy
+Model performance was evaluated using accuracy, precision, recall, F1-score, and a confusion matrix.
 
-The Random Forest model achieved an overall test accuracy of:
+Macro F1-score was included because the three match-result classes are not equally represented in the dataset.
 
-**Accuracy = 57.16%**
+Draw recall was examined separately because identifying drawn matches was particularly challenging.
 
-This means that approximately 57% of the test matches
-were classified correctly.
+## 6. Model Evaluation
 
-The accuracy was calculated as:
+### 6.1 Overall Performance
 
-Accuracy = Correct Predictions / Total Predictions
+The final Random Forest model achieved the following results:
 
-The model correctly classified 4,996 out of 8,740
-test matches.
+| Metric | Result |
+|---|---:|
+| Accuracy | 57.21% |
+| Macro F1-score | 45.76% |
+| Draw Recall | 6.21% |
+| Training observations | 37,821 |
+| Test observations | 8,740 |
 
-Although the model performs better than always predicting
-the most common test-set outcome, accuracy alone does
-not fully describe its performance.
+The model correctly classified approximately 57.21% of the test matches.
 
-Therefore, precision, recall, F1-score, and a confusion
-matrix were also examined.
+For comparison, the original median-imputation baseline achieved approximately 57.16% accuracy. The complete-case model therefore improved accuracy by only 0.05 percentage points.
 
-### 5.2 Classification Report
+This small difference indicates that changing the missing-data handling method did not substantially improve predictive performance.
 
-The classification results were:
+### 6.2 Classification Performance
 
-| Match Result | Precision | Recall | F1-score |
-|--------------|----------:|-------:|---------:|
-| Home Win | 0.59 | 0.83 | 0.69 |
-| Draw | 0.41 | 0.06 | 0.11 |
-| Away Win | 0.55 | 0.60 | 0.57 |
+The model performed better at identifying home wins than draws.
 
-The overall accuracy was 0.57.
+Home wins were the most common outcome in the test dataset, followed by away wins and draws.
 
-The macro-average F1-score was approximately 0.46.
+Draw recall was approximately 6.21%, indicating that the model correctly identified only a small proportion of actual drawn matches.
 
-The model performed best when identifying home wins.
+This suggests that the Random Forest classifier struggled to distinguish drawn matches from home or away wins using the selected full-time statistics.
 
-Home wins achieved a recall of approximately 83%,
-meaning that most actual home victories were correctly
-identified.
+Although overall accuracy exceeded 57%, the low draw recall demonstrates that accuracy alone does not provide a complete assessment of model performance.
 
-Away wins achieved a recall of approximately 60%.
+### 6.3 Confusion Matrix
 
-However, draws achieved a recall of only approximately 6%.
+The confusion matrix was used to compare actual and predicted match outcomes across the three classes.
 
-This indicates that the model struggled to identify
-drawn matches.
+The results showed that home wins were identified more successfully than draws.
 
-## 6. Confusion Matrix
+A substantial number of actual drawn matches were classified as home wins or away wins.
 
-![Random Forest Confusion Matrix](random_forest_confusion_matrix.png)
+This pattern suggests that the model favoured more common or easier-to-identify outcomes rather than consistently recognising all three classes.
 
-The confusion matrix compares actual match outcomes
-with the model's predictions.
+The confusion matrix is saved as:
 
-| Actual / Predicted | Home Win | Draw | Away Win |
-|--------------------|---------:|-----:|---------:|
-| Home Win | 3294 | 106 | 576 |
-| Draw | 1302 | 138 | 719 |
-| Away Win | 945 | 96 | 1564 |
-
-The model correctly predicted:
-
-- 3,294 home wins
-- 138 draws
-- 1,564 away wins
-
-The confusion matrix reveals that the model frequently
-classified drawn matches as home wins or away wins.
-
-Of the 2,159 actual draws, only 138 were correctly
-identified.
-
-In comparison, 1,302 draws were incorrectly classified
-as home wins, while 719 were classified as away wins.
-
-This suggests that the model has difficulty distinguishing
-draws from matches with a winning team.
-
-The model also shows a tendency to predict home wins
-more frequently than draws.
+`rf_complete_case_confusion_matrix.png`
 
 ## 7. Feature Importance
 
-![Random Forest Feature Importance](random_forest_feature_importance.png)
+Random Forest feature importance was used to investigate which match statistics contributed most strongly to the model's decisions.
 
-Feature importance was examined to investigate which
-variables contributed most to the model's decisions.
+The most important predictors were:
 
-The two most important features were:
+| Feature | Importance (approximately) |
+|---|---:|
+| HST — Home shots on target | 22.45% |
+| AST — Away shots on target | 19.97% |
+| HC — Home corners | 8.10% |
+| HS — Home shots | 8.03% |
+| AS — Away shots | 7.68% |
 
-1. HST: Home Shots on Target
-2. AST: Away Shots on Target
+Home and away shots on target were the two most influential features.
 
-Other relevant features included:
+This suggests that attacking performance, particularly the number of shots on target, was strongly associated with how the Random Forest classified match outcomes.
 
-- HC: Home Corners
-- HS: Home Shots
-- AS: Away Shots
-- AC: Away Corners
+Other statistics, including corners, fouls, and disciplinary records, also contributed to the model.
 
-The feature importance results suggest that shooting
-accuracy is particularly informative when classifying
-football match outcomes.
+However, Random Forest feature importance does not establish causal relationships between these statistics and match results.
 
-This finding is consistent with the earlier EDA,
-which showed a visible relationship between shots
-on target difference and match outcomes.
+The feature importance visualisation is saved as:
 
-However, feature importance does not establish causation.
+`rf_complete_case_feature_importance.png`
 
-Furthermore, the importance values describe the
-model's use of the variables rather than the
-independent predictive power of each statistic.
+## 8. Limitations
 
-## 8. Baseline Comparison
+### 8.1 Difficulty Predicting Draws
 
-To provide context for the Random Forest accuracy,
-a simple majority-class baseline was considered.
+The main limitation of the Random Forest classifier was its poor performance in identifying drawn matches.
 
-The most common outcome in the test dataset was
-a home win.
+Despite achieving approximately 57% overall accuracy, draw recall remained close to 6%.
 
-A classifier that always predicted a home win
-would achieve:
+This indicates that the model was much less effective for one outcome category than for the others.
 
-Baseline Accuracy = 3976 / 8740
+Future improvements could investigate class weighting, alternative feature engineering, and hyperparameter optimisation.
 
-**Baseline Accuracy = 45.49%**
+### 8.2 Missing-Data Assumptions
 
-The Random Forest achieved 57.16%, approximately
-11.67 percentage points higher than this baseline.
+Complete-case analysis assumes that removing incomplete observations does not introduce substantial bias.
 
-This suggests that the Random Forest extracts useful
-information from the selected match statistics.
+If the missingness mechanism is related to observed or unobserved characteristics, deleting incomplete observations may affect the representativeness of the training data.
 
-However, further comparisons with other classifiers
-would be required to assess its relative performance.
+However, only three training observations were removed in this project, so the loss of sample size was minimal.
 
-## 9. Limitations
+The comparison of four missing-data methods also showed only small differences in predictive performance.
 
-The Random Forest model has several limitations.
+### 8.3 Full-Time Statistics and Target Leakage
 
-First, the model performs poorly when identifying draws.
-Its draw recall is approximately 6%, indicating that
-most drawn matches are misclassified.
+The model uses full-time match statistics, including shots, fouls, corners, and cards.
 
-Second, the training dataset contains more home wins
-than draws or away wins.
+These variables are only fully available after a match has finished.
 
-This class imbalance may contribute to the model's
-tendency to predict home victories.
+Therefore, this model performs retrospective match-outcome classification rather than genuine pre-match forecasting.
 
-Third, the model uses only twelve selected match statistics.
-Other variables may contain useful information.
+Although final goal counts were excluded to avoid direct target leakage, the model should not be interpreted as a system that can predict match outcomes before kick-off.
 
-Fourth, the model parameters were selected as an initial
-configuration rather than through systematic
-hyperparameter optimisation.
+A genuine pre-match forecasting model would require features available before the match, such as historical team performance, previous results, and pre-match team information.
 
-Fifth, the processed datasets were supplied by a group
-member. The exact splitting procedure should be confirmed
-before making claims about performance across leagues
-or seasons.
+### 8.4 Model Configuration
 
-Finally, the input variables are full-time match statistics.
+The Random Forest model used a fixed set of hyperparameters rather than an extensively optimised configuration.
 
-Therefore, this model performs retrospective match outcome
-classification rather than prediction before kick-off.
+As a result, its performance may not represent the best achievable performance of the Random Forest algorithm.
 
-## 10. Possible Improvements
+Future work could use stratified k-fold cross-validation and hyperparameter tuning to evaluate different tree depths, minimum leaf sizes, and class-weighting strategies.
 
-Several improvements could be investigated.
+Such tuning should be performed using training data, with the test dataset reserved for final evaluation.
 
-One approach is to address class imbalance using
-class weights.
+## 9. Conclusion
 
-For example, the Random Forest classifier supports
-the parameter:
+This project developed a Random Forest classifier to classify English football match outcomes using 12 full-time match statistics.
 
-`class_weight="balanced"`
+Four missing-data handling approaches were compared: complete-case analysis, mean imputation, regression imputation, and multiple imputation.
 
-This may improve the identification of draws,
-although it does not guarantee better performance.
+Complete-case analysis achieved the highest overall accuracy of 57.21% and Macro F1-score of 45.76%. It was selected as the final method because only three training observations contained missing predictors and the method avoided introducing estimated values.
 
-Another approach is hyperparameter tuning,
-including adjusting:
+The comparison demonstrated that missing-data treatment had only a minor effect on model performance for this dataset.
 
-- Number of trees
-- Maximum tree depth
-- Minimum samples per leaf
-- Maximum features considered at each split
+Shots on target were the most important predictors, suggesting that attacking statistics played a major role in the model's classifications.
 
-Additional evaluation metrics, particularly
-macro-average F1-score and draw recall,
-should be considered alongside accuracy.
+However, the model struggled to identify draws, with recall of approximately 6.21%. In addition, because the predictors were recorded during the match, the model cannot be used for genuine pre-match forecasting.
 
-Hyperparameters should be selected using validation
-within the training data rather than repeatedly
-optimising against the test set.
+Future work should focus on improving draw classification, investigating alternative features, and optimising model hyperparameters using cross-validation.
 
-## 11. Conclusion
-
-This project developed a Random Forest classifier
-using twelve full-time football match statistics.
-
-The model achieved an accuracy of 57.16% on
-8,740 test matches.
-
-The results indicate that Random Forest can identify
-relationships between match statistics and match outcomes.
-
-Home wins were classified relatively successfully,
-while draws remained difficult to identify.
-
-Feature importance analysis showed that home and away
-shots on target were the most influential variables
-in the model.
-
-Overall, the model provides a useful initial benchmark
-for football match outcome classification.
-
-Future work should focus on improving draw classification,
-evaluating alternative models, and validating performance
-across different leagues and seasons.
-
-## 12. References
-
-Football-Data.co.uk:
-https://football-data.co.uk/data.php
-
-Scikit-learn Random Forest Classifier:
-https://scikit-learn.org/stable/modules/generated/sklearn.ensemble.RandomForestClassifier.html
-
-Scikit-learn Classification Metrics:
-https://scikit-learn.org/stable/modules/model_evaluation.html
-
-Scikit-learn Feature Importance:
-https://scikit-learn.org/stable/auto_examples/ensemble/plot_forest_importances.html
+Overall, the Random Forest model provided a useful baseline for investigating the relationship between full-time football statistics and match outcomes.
