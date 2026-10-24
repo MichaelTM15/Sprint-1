@@ -97,14 +97,13 @@ This method is simple and avoids estimating missing values. However, it can redu
 
 **Method 2: Available-case Analysis**
 
-Available-case analysis uses all available observations for each individual calculation, rather than removing an entire observation because one variable is missing.
+Available-case analysis uses all available observations for each calculation instead of removing an entire row because of missing values in unrelated variables.
 
-In this project, available-case analysis was used to examine feature summaries and correlations using the available data.
+In this project, available-case analysis was used to calculate descriptive statistics and correlations between football match features. For example, when calculating the correlation between home shots (HS) and home shots on target (HST), matches with missing values in other variables, such as home fouls (HF), could still be included.
 
-This approach retains more information for descriptive analysis. However, different calculations may use different subsets of observations, which can lead to inconsistencies or bias.
+This approach helps retain more information and avoids unnecessary data loss during exploratory analysis. However, different calculations may use different subsets of observations, which can make the results less consistent and potentially introduce bias.
 
-Available-case analysis was not evaluated as a separate Random Forest training strategy because the model requires a consistent set of predictor values for each training observation.
-
+Available-case analysis was used for descriptive analysis rather than as a separate Random Forest training method. The four Random Forest experiments instead compared complete-case analysis, mean imputation, regression imputation, and multiple imputation.
 **Method 3: Simple Imputation (Mean)**
 
 Mean imputation replaces each missing numerical value with the mean of the corresponding feature calculated from the training dataset.
