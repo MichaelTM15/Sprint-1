@@ -311,7 +311,7 @@ Such tuning should be performed using training data, with the test dataset reser
 
 This project developed a Random Forest classifier to classify English football match outcomes using 12 full-time match statistics.
 
-Four missing-data handling approaches were compared: complete-case analysis, mean imputation, regression imputation, and multiple imputation.
+Five missing-data handling approaches were considered: complete-case analysis, available-case analysis, mean imputation, regression imputation, and multiple imputation. Available-case analysis was used for descriptive statistics and correlation analysis, while the other four methods were evaluated using Random Forest classification.
 
 Complete-case analysis achieved the highest overall accuracy of 57.21% and Macro F1-score of 45.76%. It was selected as the final method because only three training observations contained missing predictors and the method avoided introducing estimated values.
 
