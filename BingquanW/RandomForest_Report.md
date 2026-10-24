@@ -85,61 +85,66 @@ Because the number of affected observations was very small relative to the train
 
 ### 4.2 Missing-Data Handling Methods
 
-Four approaches were evaluated using the Random Forest classifier.
+Five missing-data handling methods were considered in this project, following the approaches introduced in the lecture: complete-case analysis, available-case analysis, and three types of imputation.
 
 **Method 1: Complete-case Analysis**
 
-Complete-case analysis removes observations containing missing values in the required predictor variables.
+Complete-case analysis removes observations containing missing values in the variables required for the analysis.
 
-In this project, three incomplete training observations were removed, reducing the training dataset from 37,824 to 37,821 matches.
+In this project, three training observations contained missing values in the selected predictors. These observations were removed, reducing the training dataset from 37,824 to 37,821 matches.
 
-This method avoids introducing estimated values but may cause bias if the missingness mechanism is not completely at random.
+This method is simple and avoids estimating missing values. However, it can reduce sample size and may introduce bias when the data are not missing completely at random (MCAR).
 
-**Method 2: Simple Imputation (Mean)**
+**Method 2: Available-case Analysis**
 
-Simple imputation replaces missing numerical values with the mean of the corresponding feature calculated from the training data.
+Available-case analysis uses all available observations for each individual calculation, rather than removing an entire observation because one variable is missing.
 
-This method retains all training observations and is computationally efficient. However, it does not account for relationships between variables or uncertainty in the missing values.
+In this project, available-case analysis was used to examine feature summaries and correlations using the available data.
 
-**Method 3: Regression Imputation**
+This approach retains more information for descriptive analysis. However, different calculations may use different subsets of observations, which can lead to inconsistencies or bias.
 
-Regression imputation estimates missing values using information from other observed predictors.
+Available-case analysis was not evaluated as a separate Random Forest training strategy because the model requires a consistent set of predictor values for each training observation.
 
-This approach can account for relationships between variables and may produce more informed estimates than simple mean imputation.
+**Method 3: Simple Imputation (Mean)**
 
-However, its effectiveness depends on the assumptions and predictive accuracy of the imputation model.
+Mean imputation replaces each missing numerical value with the mean of the corresponding feature calculated from the training dataset.
 
-**Method 4: Multiple Imputation**
+This method is straightforward and preserves the number of training observations. However, it does not account for relationships between features and may underestimate variability.
 
-Multiple imputation generates several completed datasets by estimating missing values multiple times.
+**Method 4: Regression Imputation**
 
-In this experiment, five imputations were performed, and the resulting Random Forest predictions were combined.
+Regression imputation estimates missing values using relationships between the incomplete variable and other observed predictors.
 
-This approach reflects uncertainty in the missing values more explicitly than single imputation, but it requires additional computational resources.
+This method can make use of information from related variables, but the estimated values depend on the assumptions and accuracy of the regression model.
 
-All four approaches used the training data for their respective missing-data treatments. The original test dataset was retained for evaluation.
+**Method 5: Multiple Imputation**
+
+Multiple imputation generates several plausible completed datasets to account for uncertainty in the missing values.
+
+In this project, five imputed datasets were generated, and the resulting Random Forest predictions were combined.
+
+This approach is more computationally demanding than simple imputation but provides a way to reflect uncertainty associated with missing values.
 
 ### 4.3 Comparison of Missing-Data Methods
 
-The following results were obtained from the four Random Forest experiments.
+Five missing-data approaches were examined, but only four were evaluated through Random Forest classification. Available-case analysis was used for descriptive statistics and correlation analysis.
+
+The four Random Forest experiments produced the following results:
 
 | Method | Accuracy | Macro F1 | Draw Recall |
 |---|---:|---:|---:|
-| **Complete-case Analysis** | **57.21%** | **45.76%** | 6.21% |
-| Simple Imputation (Mean) | 56.97% | 45.57% | **6.25%** |
+| Complete-case Analysis | 57.21% | 45.76% | 6.21% |
+| Simple Imputation (Mean) | 56.97% | 45.57% | 6.25% |
 | Regression Imputation | 56.99% | 45.54% | 6.07% |
 | Multiple Imputation | 57.16% | 45.61% | 5.93% |
 
-Complete-case analysis achieved the highest overall accuracy and Macro F1-score among the four methods.
+Complete-case analysis achieved the highest accuracy and Macro F1-score among the four Random Forest experiments.
 
-Mean imputation achieved a slightly higher recall for drawn matches, although the difference was very small.
+However, the differences between methods were small. The highest and lowest accuracy values differed by only 0.24 percentage points.
 
-Multiple imputation produced results close to those of complete-case analysis, while regression imputation and mean imputation achieved slightly lower overall accuracy.
+Because only three training observations contained missing predictor values, complete-case analysis was selected for the final Random Forest model. It retained almost all training data while avoiding the need to estimate missing values.
 
-The difference between the highest and lowest accuracy was only 0.24 percentage points.
-
-These results suggest that the choice of missing-data treatment had a relatively small influence on Random Forest performance in this experiment.
-
+The results do not demonstrate that complete-case analysis is always better than imputation methods. They only indicate that its performance was marginally higher in this particular experiment.
 ### 4.4 Selection of the Final Method
 
 Complete-case analysis was selected for the final Random Forest model for three reasons.
