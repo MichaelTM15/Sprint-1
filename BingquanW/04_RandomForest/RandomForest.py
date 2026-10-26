@@ -31,7 +31,7 @@ from sklearn.metrics import (
 # 1. FILE PATHS
 # ============================================================
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parents[2]
 OUTPUT = Path(__file__).resolve().parent
 
 TRAIN_PATH = (
