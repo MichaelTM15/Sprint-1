@@ -163,7 +163,7 @@ We continue by trying to maximize the performance of the Non-Betting SVM by usin
 
 set.seed(123)
 svm_tuning_NB<-tune(svm, FTR~., data=train_data_NB[, c("FTR", selected_predictors)],
-                        kernel="radial", ranges=list(cost=2^(-1:5), gamma=2^(-5:1)),
+                        kernel="radial", ranges=list(cost=c(0.5,2,8), gamma=c(0.01,0.05,0.2)),
                         tunecontrol=tune.control(cross=5))
 
 best_parameters_NB<-svm_tuning_NB$best.parameters
@@ -180,7 +180,7 @@ saveRDS(list(
 ```{r}
 set.seed(123)
 svm_tuning_B<-tune(svm, FTR~., data=train_data_B[, c("FTR", selected_predictors_B)],
-                        kernel="radial", ranges=list(cost=2^(-1:5), gamma=2^(-5:1)),
+                        kernel="radial", ranges=list(cost=c(0.5,2,8), gamma=c(0.01,0.05,0.2)),
                         tunecontrol=tune.control(cross=5))
 
 best_parameters_B<-svm_tuning_B$best.parameters
@@ -189,7 +189,7 @@ best_svm_B<-svm_tuning_B$best.model
 saveRDS(list(
   best_svm_B=best_svm_B,
   best_parameters_B=best_parameters_B,
-  svm_tuning_B=svm_tuning_B,
+  svm_tuning_B=svm_tuning_B
   ), 
   "../MichaelM/best_svm_model_B.rds")
 ```
