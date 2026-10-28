@@ -21,7 +21,7 @@ train_data<-read.csv("../processed-data/football_train_data.csv")
 test_data<-read.csv("../processed-data/football_test_data.csv")
 ```
 
-Pre-processing:
+**Pre-processing**
 
 ```{r}
 # Pulling out the predictor variables from the outcome
@@ -68,7 +68,7 @@ So now we'll use:
 
 ```{r}
 train_data_NB<-train_data[-c(8808,32940,32949),]
-selected_predictors <- predictors[
+selected_predictors_NB<- predictors[
     colSums(is.na(train_data_NB[, predictors, drop = FALSE])) == 0
 ]
 ```
@@ -77,7 +77,7 @@ which should work:
 
 ```{r}
 sum(colSums(is.na(train_data_NB[, predictors, drop = FALSE])) == 0)
-selected_predictors
+selected_predictors_NB
 ```
 
 
@@ -161,40 +161,127 @@ We continue by trying to maximize the performance of the Non-Betting SVM by usin
 ```{r}
 # Initializing with a given seed in order to be repeatable
 
-set.seed(123)
-svm_tuning_NB<-tune(svm, FTR~., data=train_data_NB[, c("FTR", selected_predictors)],
-                        kernel="radial", ranges=list(cost=c(0.5,2,8), gamma=c(0.01,0.05,0.2)),
-                        tunecontrol=tune.control(cross=5))
+#set.seed(123)
+#svm_tuning_NB<-tune(svm, FTR~., data=train_data_NB[, c("FTR", selected_predictors)],
+ #                       kernel="radial", ranges=list(cost=c(0.5,2,8), gamma=c(0.01,0.05,0.2)),
+  #                      tunecontrol=tune.control(cross=5))
 
-best_parameters_NB<-svm_tuning_NB$best.parameters
-best_svm_NB<-svm_tuning_NB$best.model
+#best_parameters_NB<-svm_tuning_NB$best.parameters
+#best_svm_NB<-svm_tuning_NB$best.model
 
-saveRDS(list(
-  best_svm_NB=best_svm_NB,
-  best_parameters_NB=best_parameters_NB,
-  svm_tuning_NB=svm_tuning_NB
-  ), 
-  "../MichaelM/best_svm_model_NB.rds")
+#saveRDS(list(
+ # best_svm_NB=best_svm_NB,
+  #best_parameters_NB=best_parameters_NB,
+  #svm_tuning_NB=svm_tuning_NB
+  #), 
+  #"../MichaelM/best_svm_model_NB.rds")
 ```
 
 ```{r}
-set.seed(123)
-svm_tuning_B<-tune(svm, FTR~., data=train_data_B[, c("FTR", selected_predictors_B)],
-                        kernel="radial", ranges=list(cost=c(0.5,2,8), gamma=c(0.01,0.05,0.2)),
-                        tunecontrol=tune.control(cross=5))
+# Repeating for the model with the B365 variables:
+#set.seed(123)
+#svm_tuning_B<-tune(svm, FTR~., data=train_data_B[, c("FTR", selected_predictors_B)],
+ #                       kernel="radial", ranges=list(cost=c(0.5,2,8), gamma=c(0.01,0.05,0.2)),
+  #                      tunecontrol=tune.control(cross=5))
 
-best_parameters_B<-svm_tuning_B$best.parameters
-best_svm_B<-svm_tuning_B$best.model
+#best_parameters_B<-svm_tuning_B$best.parameters
+#best_svm_B<-svm_tuning_B$best.model
 
-saveRDS(list(
-  best_svm_B=best_svm_B,
-  best_parameters_B=best_parameters_B,
-  svm_tuning_B=svm_tuning_B
-  ), 
-  "../MichaelM/best_svm_model_B.rds")
+#saveRDS(list(
+ # best_svm_B=best_svm_B,
+  #best_parameters_B=best_parameters_B,
+  #svm_tuning_B=svm_tuning_B
+  #), 
+  #"../MichaelM/best_svm_model_B.rds")
 ```
 
-Investigating missingness for other variables:
+I've kept the code but made it into a comment as we don't want to have to perform this CV each time running the file. Now we can instead extract the tuned SVMs from their locations:
+
+```{r}
+tuned_svm_NB<-readRDS("../MichaelM/best_svm_model_NB.rds")
+tuned_svm_B<-readRDS("../MichaelM/best_svm_model_B.rds")
+
+best_svm_NB<-tuned_svm_NB$best_svm_NB
+best_svm_B<-tuned_svm_B$best_svm_B
+
+
+best_parameters_NB<-tuned_svm_NB$best_parameters_NB
+best_parameters_B<-tuned_svm_B$best_parameters_B
+
+```
+
+Now having a look at the best parameters for each radial SVM model:
+
+```{r}
+best_parameters_NB
+```
+
+```{r}
+best_parameters_B
+```
+Now checking the performance:
+
+```{r}
+best_svm_predictions_B<-predict(best_svm_B, newdata=test_data[, selected_predictors_B, drop=FALSE])
+best_confusion_matrix_B<-table(Actual=test_data$FTR, Predicted=best_svm_predictions_B)
+
+best_svm_predictions_NB<-predict(best_svm_NB, newdata=test_data[, selected_predictors_NB, drop=FALSE])
+best_confusion_matrix_NB<-table(Actual=test_data$FTR, Predicted=best_svm_predictions_NB)
+```
+
+Plotting each confusion matrix:
+
+```{r}
+best_confusion_matrix_B
+best_Accuracy_B<-mean(best_svm_predictions_B==test_data$FTR)
+best_Accuracy_B
+```
+
+```{r}
+round(diag(prop.table(best_confusion_matrix_B, margin=1))*100, 2)
+```
+
+and
+
+```{r}
+best_confusion_matrix_NB
+best_Accuracy_NB<-mean(best_svm_predictions_NB==test_data$FTR)
+best_Accuracy_NB
+```
+
+```{r}
+round(diag(prop.table(best_confusion_matrix_NB, margin=1))*100, 2)
+```
+
+This is strange - K-fold CV is not giving much better performance.
+Let's have a look at what the CV accuracy for each model was:
+
+```{r}
+tuned_svm_NB$svm_tuning_NB$best.performance
+tuned_svm_B$svm_tuning_B$best.performance
+```
+Wow - even though the test accuracy hasn't improved, it is actually better than the CV accuracy.
+Let's test to see how it performs on the training data:
+
+```{r}
+train_predictions_B<-predict(best_svm_B, newdata=train_data_B[, selected_predictors_B, drop=FALSE])
+train_confusion_matrix_B<-table(Actual=train_data_B$FTR, Predicted=train_predictions_B)
+
+train_predictions_NB<-predict(best_svm_NB, newdata=train_data_NB[, selected_predictors_NB, drop=FALSE])
+train_confusion_matrix_NB<-table(Actual=train_data_NB$FTR, Predicted=train_predictions_NB)
+```
+
+```{r}
+train_accuracy_B<-sum(diag(train_confusion_matrix_B))/sum(train_confusion_matrix_B)
+train_accuracy_NB<-sum(diag(train_confusion_matrix_NB))/sum(train_confusion_matrix_NB)
+
+train_accuracy_NB
+train_accuracy_B
+```
+The non-betting training data has pretty much the same accuracy for the training and test data, while the betting model seems to improve when using the test data.
+
+
+**Investigating missingness for other variables**
 
 ```{r}
 odds_var<-setdiff(names(train_data), selected_predictors_B)
@@ -225,7 +312,9 @@ Imputing:
 
 ```{r}
 library(mice)
+```
 
+```{r}
 impute_vars <- c(
   "BWA", "BWD", "BWH",
   "WHA", "WHD", "WHH",
@@ -233,16 +322,142 @@ impute_vars <- c(
 )
 ```
 
+```{r}
+# Combining all of the predictors together: we are going to impute the missing values in the 12 rows total we had
+# previously removed
+
+selected_predictors_imputed <- unique(c(
+  selected_predictors_B,
+  impute_vars
+))
+
+train_imp <- train_data[
+  , c("FTR", selected_predictors_imputed),
+  drop = FALSE
+]
+
+```
+
+```{r}
+ini <- mice(
+  train_imp,
+  maxit = 0,
+  printFlag = FALSE
+)
+
+meth <- ini$method
+pred <- ini$predictorMatrix
+
+meth["FTR"] <- ""
+
+pred[, "FTR"] <- 0
+
+for (v in selected_predictors_imputed) {
+  if (anyNA(train_imp[[v]])) {
+    meth[v] <- "pmm"
+  } else {
+    meth[v] <- ""
+  }
+}
+
+imp <- mice(
+  train_imp,
+  method = meth,
+  predictorMatrix = pred,
+  m = 1,
+  maxit = 5,
+  seed = 123,
+  printFlag = FALSE
+)
+
+train_imp_filled <- complete(imp, 1)
+
+```
+
+This should have imputed all of the values that were missing, let's check:
+
+```{r}
+colSums(is.na(train_imp_filled))
+```
+
+As this is good, we can once again try to build an svm model of this and we'll just check its baseline performance on the test set, but first we must check for missingness in the test set:
+
+```{r}
+colSums(is.na(test_data[, selected_predictors_imputed, drop=FALSE]))
+sum(!complete.cases(test_data[, selected_predictors_imputed, drop = FALSE]))
+```
+
+Unfortunately unlike with the match statistics and Bet365 odds, there seems to be a fair amount of missingness - to be precise, (1436/8740)*100 = 16.43%. So a bit higher than the 12% cutoff from the training data, but as it's just for a baseline performance we will just impute the missing values in the test dataset as well.
+
+```{r}
+test_imp <- test_data[
+  , selected_predictors_imputed,
+  drop = FALSE
+]
+
+imp_test <- mice(
+  test_imp,
+  m = 1,
+  method = "pmm",
+  maxit = 5,
+  seed = 123,
+  printFlag = FALSE
+)
+
+test_imp_filled <- complete(imp_test, 1)
+```
+
+```{r}
+# Checking that it's worked:
+sum(is.na(test_imp_filled))
+```
+
+Time to fit the svm in the same way as the original models:
+
+```{r}
+# Converting result to factor again
+train_imp_filled$FTR <- factor(
+  train_imp_filled$FTR,
+  levels = c("H", "D", "A")
+)
+
+svm_imputed <- svm(
+  FTR ~ .,
+  data = train_imp_filled[
+    , c("FTR", selected_predictors_imputed),
+    drop = FALSE
+  ],
+  kernel = "radial",
+  cost = 1,
+  gamma = 1 / length(selected_predictors_imputed),
+  scale = TRUE
+)
+```
+
+and test its performance:
+
+```{r}
+svm_predictions_imputed <- predict(svm_imputed, newdata = test_imp_filled)
+confusion_matrix_imputed <- table(Actual = test_data$FTR, Predicted = svm_predictions_imputed)
+
+Accuracy_imputed <- mean(svm_predictions_imputed == test_data$FTR)
+```
+
+```{r}
+confusion_matrix_imputed
+Accuracy_imputed
+```
+
+```{r}
+round(prop.table(confusion_matrix_imputed, margin = 1) * 100,1)
+```
+
+Unfortunately as the accuracy is very slightly lower than with just the B365 odds, but still in turn reasonably higher than without any betting odds, we can reason that adding betting odds as a predictor improves predictive performance, but does not stack with more and more sites, i.e. there isn't any extra predictive power to be gleamed from multiple different sites.
+
+In particular, the SVM(s) had strong problems knowing when to classify a draw, though their marginal accuracy for away and especially home wins was relatively good. The accuracy reported on the test set actually ended up being higher than on the training data, so there is no evidence of over fitting. Earlier analysis of the data revealed that the lower leagues had a smaller proportion of home wins and a higher proportion of draws in comparison with the Premier League. Thus this is likely to have contributed to the increase in overall accuracy.
 
 
-
-
-
-
-
-
-
-
+**Some graphs and plots**
 
 
 
