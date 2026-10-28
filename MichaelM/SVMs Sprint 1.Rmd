@@ -449,7 +449,7 @@ Accuracy_imputed
 ```
 
 ```{r}
-round(prop.table(confusion_matrix_imputed, margin = 1) * 100,1)
+round(diag(prop.table(confusion_matrix_imputed, margin = 1) * 100,1))
 ```
 
 Unfortunately as the accuracy is very slightly lower than with just the B365 odds, but still in turn reasonably higher than without any betting odds, we can reason that adding betting odds as a predictor improves predictive performance, but does not stack with more and more sites, i.e. there isn't any extra predictive power to be gleamed from multiple different sites in this experiment.
@@ -488,15 +488,15 @@ heatmap(
   breaks = seq(-1, 1, length.out = 101),
   main = "Correlation Between Opening Odds"
 )
-legend("topright", legend=c("Negative (-1)", "Zero (0)", "Positive (+1)"),
+legend("topright", legend=c("Negative (~ -1)", "Zero (~ 0)", "Positive (~ +1)"),
          fill=c("yellow", "orange", "red"), cex=0.7, bty="n")
 
-
+# Just note that the color scale should be continuous but it's hard to see, i.e. orange doesn't mean exactly 0 etc.
 ```
 
 This is certainly evidence that many of the betting odds are highly correlated - in particular for the same outcomes across different sites. The red patches correspond to strong positive correlation - where the same results (Home, Draw, and Away) meet for different sites. Inversely the yellow patches are where Home win meets Away win. Meanwhile, the Draw odds seem more varied; they appear to be also highly positively correlated with the Away wins but more neutral when matched with the Home wins, which is interesting. 
 
-These patterns suggest overlapping information between the bookmakers odds, though their individual usefulness for classification doesn't directly follow from just their correlations.
+This suggests that there is some overlapping information between the bookmakers odds, however these correlations alone don't fully reveal each of their individual usefulness for the classification.
 
 
 ```{r}
