@@ -376,7 +376,7 @@ make_heatmap<-function(dataset, plot_title){
   legend("topright", legend=c("Negative (-1)", "Zero (0)", "Positive (+1)"),
          fill=c("yellow", "orange", "red"), cex=0.7, bty="n")
 }
-
+# Just note that the color scale should be continuous but it's hard to see, i.e. orange doesn't mean exactly 0 etc.
 ```
 
 ```{r}

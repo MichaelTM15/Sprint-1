@@ -452,13 +452,56 @@ Accuracy_imputed
 round(prop.table(confusion_matrix_imputed, margin = 1) * 100,1)
 ```
 
-Unfortunately as the accuracy is very slightly lower than with just the B365 odds, but still in turn reasonably higher than without any betting odds, we can reason that adding betting odds as a predictor improves predictive performance, but does not stack with more and more sites, i.e. there isn't any extra predictive power to be gleamed from multiple different sites.
+Unfortunately as the accuracy is very slightly lower than with just the B365 odds, but still in turn reasonably higher than without any betting odds, we can reason that adding betting odds as a predictor improves predictive performance, but does not stack with more and more sites, i.e. there isn't any extra predictive power to be gleamed from multiple different sites in this experiment.
 
 In particular, the SVM(s) had strong problems knowing when to classify a draw, though their marginal accuracy for away and especially home wins was relatively good. The accuracy reported on the test set actually ended up being higher than on the training data, so there is no evidence of over fitting. Earlier analysis of the data revealed that the lower leagues had a smaller proportion of home wins and a higher proportion of draws in comparison with the Premier League. Thus this is likely to have contributed to the increase in overall accuracy.
 
 
 **Some graphs and plots**
 
+```{r}
+odds_vars <- c(
+  "B365H", "B365D", "B365A",
+  "BWA", "BWD", "BWH",
+  "WHA", "WHD", "WHH",
+  "IWH", "IWD", "IWA"
+)
 
+odds_data <- train_imp_filled[, odds_vars, drop = FALSE]
+
+odds_correlations <- cor(
+  odds_data,
+  use = "pairwise.complete.obs"
+)
+
+heatmap_colours <- colorRampPalette(
+  c("yellow", "orange", "red")
+)(100)
+```
+
+```{r}
+heatmap(
+  odds_correlations,
+  symm = TRUE,
+  scale = "none",
+  col = heatmap_colours,
+  breaks = seq(-1, 1, length.out = 101),
+  main = "Correlation Between Opening Odds"
+)
+legend("topright", legend=c("Negative (-1)", "Zero (0)", "Positive (+1)"),
+         fill=c("yellow", "orange", "red"), cex=0.7, bty="n")
+
+
+```
+
+This is certainly evidence that many of the betting odds are highly correlated - in particular for the same outcomes across different sites. The red patches correspond to strong positive correlation - where the same results (Home, Draw, and Away) meet for different sites. Inversely the yellow patches are where Home win meets Away win. Meanwhile, the Draw odds seem more varied; they appear to be also highly positively correlated with the Away wins but more neutral when matched with the Home wins, which is interesting. 
+
+These patterns suggest overlapping information between the bookmakers odds, though their individual usefulness for classification doesn't directly follow from just their correlations.
+
+
+```{r}
+
+
+```
 
 
