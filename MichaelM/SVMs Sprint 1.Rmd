@@ -499,9 +499,39 @@ This is certainly evidence that many of the betting odds are highly correlated -
 This suggests that there is some overlapping information between the bookmakers odds, however these correlations alone don't fully reveal each of their individual usefulness for the classification.
 
 
+*ROC curve*
+
+We will plot 3 ROC curves for the best performing SVM using the non-imputed datasets.
+
 ```{r}
-
-
+library(pROC)
 ```
+
+We will need to refit the best SVMs with probability=TRUE in order to plot. Luckily we know the best parameters from the K-fold CV: 
+
+```{r}
+best_svm_B_prob <- svm(
+  FTR ~ .,
+  data = train_data_B[
+    , c("FTR", selected_predictors_B), drop = FALSE
+  ],
+  kernel = "radial",
+  cost = best_parameters_B$cost,
+  gamma = best_parameters_B$gamma,
+  scale = TRUE,
+  probability = TRUE
+)
+
+pred_B_prob <- predict(best_svm_B_prob, newdata = test_data[, selected_predictors_B, drop = FALSE], probability = TRUE)
+```
+
+```{r}
+prob_B <- attr(pred_B_prob, "probabilities")
+
+head(prob_B)
+```
+
+
+
 
 
