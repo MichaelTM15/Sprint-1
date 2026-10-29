@@ -538,7 +538,9 @@ best_svm_B_prob <- svm(
   scale = TRUE,
   probability = TRUE
 )
+```
 
+```{r}
 pred_B_prob <- predict(best_svm_B_prob, newdata = test_data[, selected_predictors_B, drop = FALSE], probability = TRUE)
 ```
 
@@ -547,6 +549,37 @@ prob_B <- attr(pred_B_prob, "probabilities")
 
 head(prob_B)
 ```
+
+```{r}
+actual <- factor(test_data$FTR, levels = c("H", "D", "A"))
+
+roc_H <- roc(actual == "H", prob_B[, "H"], quiet = TRUE)
+roc_D <- roc(actual == "D", prob_B[, "D"], quiet = TRUE)
+roc_A <- roc(actual == "A", prob_B[, "A"], quiet = TRUE)
+
+plot(roc_H, col = "blue",
+     xlim = c(1.0, 0.0),
+     main = "ROC Curves - Best SVM with Betting Odds")
+plot(roc_D, col = "green", add = TRUE)
+plot(roc_A, col = "red", add = TRUE)
+
+abline(a = 0, b = 1, lty = 2, col = "grey")
+
+legend(
+  "bottomright",
+  legend = c(
+    paste("Home win AUC:", round(auc(roc_H), 3)),
+    paste("Draw AUC:", round(auc(roc_D), 3)),
+    paste("Away win AUC:", round(auc(roc_A), 3))
+  ),
+  col = c("blue", "green", "red"),
+  lty = 1,
+  cex = 0.8
+)
+
+```
+
+
 
 
 
