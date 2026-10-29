@@ -474,6 +474,42 @@ Unfortunately as the accuracy is very slightly lower than with just the B365 odd
 In particular, the SVM(s) had strong problems knowing when to classify a draw, though their marginal accuracy for away and especially home wins was relatively good. The accuracy reported on the test set actually ended up being higher than on the training data, so there is no evidence of over fitting. Earlier analysis of the data revealed that the lower leagues had a smaller proportion of home wins and a higher proportion of draws in comparison with the Premier League. Thus this is likely to have contributed to the increase in overall accuracy.
 
 
+```{r}
+# Better way of doing the test data imputation
+
+
+#> test_imp1 <- test_data[
+#+     , selected_predictors_imputed,
+#+     drop = FALSE
+#+ ]
+#> test_imp1$FTR <- NA
+#> test_imp1 <- test_imp1[, names(train_imp), drop = FALSE]
+#> imp_test1 <- mice.mids(
+#+     imp,
+#+     newdata = test_imp1,
+#+     maxit = 5,
+#+     seed = 123,
+#+     printFlag = FALSE
+#+ )
+#> 
+#> test_imp_filled1 <- complete(imp_test1, 1)
+#> test_imp_filled1$FTR <- NULL
+
+#> svm_predictions_imputed1 <- predict(svm_imputed, newdata = test_imp_filled1)
+#> confusion_matrix_imputed1 <- table(Actual = test_data$FTR, Predicted = svm_predictions_imputed1)
+#> confusion_matrix_imputed1
+#      Predicted
+#Actual    H    D    A
+#     H 3369   96  511
+#     D 1288  120  751
+#     A  774  108 1723
+#> sum(diag(confusion_matrix_imputed1))/sum(confusion_matrix_imputed1)
+#[1] 0.5963387
+
+# Overall accuracy result wasn't too different
+```
+
+
 **Some graphs and plots**
 
 ```{r}
@@ -556,6 +592,7 @@ actual <- factor(test_data$FTR, levels = c("H", "D", "A"))
 roc_H <- roc(actual == "H", prob_B[, "H"], quiet = TRUE)
 roc_D <- roc(actual == "D", prob_B[, "D"], quiet = TRUE)
 roc_A <- roc(actual == "A", prob_B[, "A"], quiet = TRUE)
+macro_auc<-mean(c(auc(roc_H), auc(roc_D), auc(roc_A)))
 
 plot(roc_H, col = "blue",
      xlim = c(1.0, 0.0),
@@ -570,13 +607,39 @@ legend(
   legend = c(
     paste("Home win AUC:", round(auc(roc_H), 3)),
     paste("Draw AUC:", round(auc(roc_D), 3)),
-    paste("Away win AUC:", round(auc(roc_A), 3))
+    paste("Away win AUC:", round(auc(roc_A), 3)),
+    paste("Macro-average AUC:", round(macro_auc, 3))
   ),
-  col = c("blue", "green", "red"),
+  col = c("blue", "green", "red", "white"),
   lty = 1,
   cex = 0.8
 )
 
+```
+
+```{r}
+multiclass_auc <- pROC::multiclass.roc(
+  response = actual,
+  predictor = prob_B
+)
+
+print(multiclass_auc)
+```
+
+```{r}
+library(caret)
+```
+
+```{r}
+predicted <- factor(as.character(best_svm_predictions_B), levels = c("H", "D", "A"))
+
+
+results <- confusionMatrix(
+  data = predicted,
+  reference = actual
+)
+
+print(results)
 ```
 
 Next we will plot a bar chart of feature importance to the best performing SVM:
@@ -751,8 +814,8 @@ ggplot(odds_compare, aes(x = HomeProb, y = AwayProb, colour = Result)) +
   ) +
   labs(
     title = "Actual vs SVM-Predicted Results by Bet365 Odds",
-    x = "Bet365 home-win odds (B365H)",
-    y = "Bet365 away-win odds (B365A)",
+    x = "Bet365 home-win probability (B365H)",
+    y = "Bet365 away-win probability (B365A)",
     colour = "Match result"
   ) +
   theme_minimal(base_size = 12)
@@ -789,9 +852,11 @@ ggplot(draw_data, aes(x = Outcome, y = B365D, fill = Outcome)) +
 
 ```
 
+These boxplots looking broadly similar is consistent with the SVM's struggles to classify a draw. It had been hoped that the draw odds would have provided helpful information, yet we can see that the Bet365 Draw Odds alone do not largely differ between matches that were a draw and those that weren't. This doesn't give the full picture, as they could give stronger support in combination with other features - but as shown before, the match statistics alone also had a very low marginal prediction accuracy for draws, so the improvement being limited is not surprising.
 
 
-
-
+```{r}
+load("football_svm_environment.RData")
+```
 
 
