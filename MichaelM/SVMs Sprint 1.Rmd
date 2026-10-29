@@ -27,20 +27,27 @@ test_data<-read.csv("../processed-data/football_test_data.csv")
 # Pulling out the predictor variables from the outcome
 predictors<-setdiff(names(train_data), "FTR")
 
+# Checking which predictors have no missing variables
 selected_predictors <- predictors[
     colSums(is.na(train_data[, predictors, drop = FALSE])) == 0
 ]
+
+selected_predictors
 ```
 
 That seems to be a problem - all predictors have at least one row with missing values
 
 ```{r}
 which(is.na(train_data$AST))
-train_data1<-train_data[-8808,]
 ```
 
 I personally inspected this in the Excel file, it had N/A for almost all of the match statistics weirdly.
 So removing it for now.
+
+```{r}
+train_data1<-train_data[-8808,]
+```
+
 Trying again:
 
 ```{r}
@@ -81,14 +88,11 @@ selected_predictors_NB
 ```
 
 
-
-
-
-
 ```{r}
 nrow(train_data_NB)
 nrow(test_data)
 ```
+
 Now onto fitting an SVM:
 
 ```{r}
@@ -97,24 +101,26 @@ Now onto fitting an SVM:
 train_data_NB$FTR<-factor(train_data_NB$FTR, levels=c("H", "D", "A"))
 test_data$FTR<-factor(test_data$FTR, levels=c("H", "D", "A"))
 
-svm_model<-svm(FTR~., data=train_data_NB[, c("FTR", selected_predictors)],
+svm_model_NB<-svm(FTR~., data=train_data_NB[, c("FTR", selected_predictors_NB)],
                kernel="radial", cost=1, gamma=1/length(predictors), scale=TRUE)
 
 ```
 
 ```{r}
-svm_predictions1<-predict(svm_model, newdata=test_data[, selected_predictors, drop=FALSE])
+svm_predictions_NB<-predict(svm_model_NB, newdata=test_data[, selected_predictors_NB, drop=FALSE])
+```
 
-confusion_matrix_NB<-table(Actual=test_data$FTR, Predicted=svm_predictions1)
+```{r}
+confusion_matrix_NB<-table(Actual=test_data$FTR, Predicted=svm_predictions_NB)
 ```
 
 ```{r}
 confusion_matrix_NB
-Accuracy<-mean(svm_predictions1==test_data$FTR)
-Accuracy
+Accuracy_NB<-sum(diag(confusion_matrix_NB))/sum(confusion_matrix_NB)
+Accuracy_NB
 ```
 
-So we have an accuracy of 57.5% which is quite bad. It didn't seem to predict many draws at all.
+So we have an accuracy of 57.5% which is isn't great. It didn't seem to predict many draws at all.
 In fact we can do:
 
 ```{r}
@@ -130,7 +136,13 @@ Setting up the dataset with the predictors:
 
 ```{r}
 train_data_B<-train_data_NB[complete.cases(train_data_NB[, c("B365H", "B365D", "B365A")]),]
-selected_predictors_B<-unique(c(selected_predictors, "B365H", "B365D", "B365A"))
+nrow(train_data_B)
+```
+
+Only 9 more rows were removed, which is fine given the number still left.
+
+```{r}
+selected_predictors_B<-unique(c(selected_predictors_NB, "B365H", "B365D", "B365A"))
 ```
 
 and fitting the model:
@@ -149,20 +161,21 @@ confusion_matrix_B<-table(Actual=test_data$FTR, Predicted=svm_predictions_B)
 
 ```{r}
 confusion_matrix_B
-Accuracy_B<-mean(svm_predictions_B==test_data$FTR)
+Accuracy_B<-sum(diag(confusion_matrix_B))/sum(confusion_matrix_B)
 Accuracy_B
 ```
 ```{r}
 round(diag(prop.table(confusion_matrix_B, margin=1))*100, 2)
 ```
+
 This is a slight improvement for all outcomes.
-We continue by trying to maximize the performance of the Non-Betting SVM by using K-fold CV
+We continue by trying to maximize the performance of the Betting and Non-Betting SVMs by using K-fold CV
 
 ```{r}
 # Initializing with a given seed in order to be repeatable
 
 #set.seed(123)
-#svm_tuning_NB<-tune(svm, FTR~., data=train_data_NB[, c("FTR", selected_predictors)],
+#svm_tuning_NB<-tune(svm, FTR~., data=train_data_NB[, c("FTR", selected_predictors_NB)],
  #                       kernel="radial", ranges=list(cost=c(0.5,2,8), gamma=c(0.01,0.05,0.2)),
   #                      tunecontrol=tune.control(cross=5))
 
@@ -233,7 +246,7 @@ Plotting each confusion matrix:
 
 ```{r}
 best_confusion_matrix_B
-best_Accuracy_B<-mean(best_svm_predictions_B==test_data$FTR)
+best_Accuracy_B<-sum(diag(best_confusion_matrix_B))/sum(best_confusion_matrix_B)
 best_Accuracy_B
 ```
 
@@ -245,7 +258,7 @@ and
 
 ```{r}
 best_confusion_matrix_NB
-best_Accuracy_NB<-mean(best_svm_predictions_NB==test_data$FTR)
+best_Accuracy_NB<-sum(diag(best_confusion_matrix_NB))/sum(best_confusion_matrix_NB)
 best_Accuracy_NB
 ```
 
@@ -260,6 +273,7 @@ Let's have a look at what the CV accuracy for each model was:
 tuned_svm_NB$svm_tuning_NB$best.performance
 tuned_svm_B$svm_tuning_B$best.performance
 ```
+
 Wow - even though the test accuracy hasn't improved, it is actually better than the CV accuracy.
 Let's test to see how it performs on the training data:
 
@@ -278,6 +292,7 @@ train_accuracy_NB<-sum(diag(train_confusion_matrix_NB))/sum(train_confusion_matr
 train_accuracy_NB
 train_accuracy_B
 ```
+
 The non-betting training data has pretty much the same accuracy for the training and test data, while the betting model seems to improve when using the test data.
 
 
@@ -439,8 +454,10 @@ and test its performance:
 ```{r}
 svm_predictions_imputed <- predict(svm_imputed, newdata = test_imp_filled)
 confusion_matrix_imputed <- table(Actual = test_data$FTR, Predicted = svm_predictions_imputed)
+```
 
-Accuracy_imputed <- mean(svm_predictions_imputed == test_data$FTR)
+```{r}
+Accuracy_imputed <- sum(diag(confusion_matrix_imputed))/sum(confusion_matrix_imputed)
 ```
 
 ```{r}
@@ -449,7 +466,7 @@ Accuracy_imputed
 ```
 
 ```{r}
-round(diag(prop.table(confusion_matrix_imputed, margin = 1) * 100,1))
+round(diag(prop.table(confusion_matrix_imputed, margin = 1)) * 100, 2)
 ```
 
 Unfortunately as the accuracy is very slightly lower than with just the B365 odds, but still in turn reasonably higher than without any betting odds, we can reason that adding betting odds as a predictor improves predictive performance, but does not stack with more and more sites, i.e. there isn't any extra predictive power to be gleamed from multiple different sites in this experiment.
