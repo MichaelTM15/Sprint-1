@@ -4,4 +4,4 @@ Feature Importance: Primary predictive drivers include market odds (Bet365), his
 Confusion Matrix & Draw Volatility:
 The model demonstrates strong predictive power for Home Wins (2,657 correct) and Away Wins (1,360 correct).
 As expected in sports analytics, Draws remain challenging due to high outcome variance and class imbalance (229 correctly identified draws out of 2,061 total actual draws).
-test accuracy of home wins, away wins and draws, add rse curve, look at area under the curve
+test accuracy of home wins, away wins and draws, add rse curve on home, draw, away, look at area under the curve
