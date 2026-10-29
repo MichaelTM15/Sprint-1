@@ -579,6 +579,216 @@ legend(
 
 ```
 
+Next we will plot a bar chart of feature importance to the best performing SVM:
+
+```{r}
+baseline_accuracy<-mean(pred_B_prob==actual)
+set.seed(123)
+
+importance_scores <- numeric(length(selected_predictors_B))
+names(importance_scores) <- selected_predictors_B
+
+for (variable in selected_predictors_B) {
+
+  shuffled_test <- test_data[, selected_predictors_B, drop=FALSE]
+
+  shuffled_test[[variable]] <- sample(
+    shuffled_test[[variable]]
+  )
+
+  shuffled_predictions <- predict(
+    best_svm_B_prob,
+    newdata = shuffled_test
+  )
+
+  shuffled_accuracy <- mean(
+    shuffled_predictions == actual
+  )
+
+  importance_scores[variable] <- baseline_accuracy - shuffled_accuracy
+}
+
+
+importance_scores <- sort(importance_scores, decreasing = TRUE)
+```
+
+```{r}
+par(mar = c(5,9,4,2), mgp = c(4,1,0))
+
+barplot(
+  importance_scores,
+  horiz = TRUE,
+  las = 1,
+  border = NA,
+  col = "steelblue",
+  main = "Permutation Importance for the Best Betting Odds SVM",
+  xlab = "Decrease in test accuracy when left out",
+  ylab = "Feature",
+  xlim = c(-0.01, 0.08),
+  xaxt = "n",
+  cex.names = 0.85,
+  cex.axis = 0.85,
+  cex.lab = 0.95,
+  cex.main = 1
+)
+axis(
+  side = 1,
+  at = seq(-0.01, 0.08, by = 0.01),
+  labels = sprintf("%.2f", seq(-0.01, 0.08, by = 0.01))
+)
+abline(v = 0, lty = 2)
+```
+
+Next for a scatter plot of the actual outcomes comparing Home Shots on Target (HST) to Away Shots on Target (AST):
+
+```{r}
+library(ggplot2)
+library(patchwork)
+```
+
+```{r}
+scatter_data <- data.frame(
+  HST = test_data$HST,
+  AST = test_data$AST,
+  Result = factor(test_data$FTR, levels = c("H", "D", "A")),
+  Type = "Actual Result"
+)
+```
+
+```{r}
+ggplot(scatter_data, aes(x = HST, y = AST, colour = Result)) +
+  geom_jitter(width = 0.2, height = 0.2, alpha = 0.45, size = 1.8) +
+  geom_abline(
+    slope = 1,
+    intercept = 0,
+    linetype = "dashed",
+    colour = "grey30"
+  ) +
+  scale_colour_manual(
+    values = c("H" = "cornflowerblue", "D" = "darkorange", "A" = "firebrick"),
+    labels = c("H" = "Home win", "D" = "Draw", "A" = "Away win")
+  ) +
+  labs(
+    title = "Shots on Target by Full-Time Match Result",
+    x = "Home-team shots on target (HST)",
+    y = "Away-team shots on target (AST)",
+    colour = "Match result"
+  ) +
+  theme_minimal(base_size = 12)
+```
+
+This has a diagonal line where the number of home/away shots on target are equal.
+We will visually compare this to how the best SVM splits the classification between these two features:
+
+```{r}
+scatter_predicted <- data.frame(
+  HST = test_data$HST,
+  AST = test_data$AST,
+  Result = factor(best_svm_predictions_B, levels = c("H", "D", "A")),
+  Type = "SVM prediction"
+)
+```
+
+```{r}
+scatter_compare <- rbind(scatter_data, scatter_predicted)
+
+ggplot(scatter_compare, aes(x = HST, y = AST, colour = Result)) +
+  geom_jitter(width = 0.2, height = 0.2, alpha = 0.45, size = 1.5) +
+  facet_wrap(~Type) +
+  scale_colour_manual(
+    values = c("H" = "cornflowerblue", "D" = "darkorange", "A" = "firebrick"),
+    labels = c("H" = "Home win", "D" = "Draw", "A" = "Away win")
+  ) +
+  geom_abline(
+  slope = 1,
+  intercept = 0,
+  linetype = "dashed",
+  colour = "grey30",
+  linewidth = 0.8
+  ) +
+  labs(
+    title = "Actual vs SVM-Predicted Match Results",
+    x = "Home-team shots on target (HST)",
+    y = "Away-team shots on target (AST)",
+    colour = "Match result"
+  ) +
+  theme_minimal(base_size = 12)
+```
+
+Next we will do the same for the Bet365 Home vs Away Odds:
+
+```{r}
+odds_actual <- data.frame(
+  B365H = test_data$B365H,
+  B365A = test_data$B365A,
+  Result = factor(test_data$FTR, levels = c("H", "D", "A")),
+  Type = "Actual result"
+)
+
+odds_predicted <- data.frame(
+  B365H = test_data$B365H,
+  B365A = test_data$B365A,
+  Result = factor(as.character(best_svm_predictions_B), levels = c("H", "D", "A")),
+  Type = "SVM prediction"
+)
+
+# We use the implied probabilities, which are ~ 1/Odds to get a clearer picture
+
+odds_actual$HomeProb <- 1 / odds_actual$B365H
+odds_actual$AwayProb <- 1 / odds_actual$B365A
+
+odds_predicted$HomeProb <- 1 / odds_predicted$B365H
+odds_predicted$AwayProb <- 1 / odds_predicted$B365A
+
+odds_compare <- rbind(odds_actual, odds_predicted)
+
+ggplot(odds_compare, aes(x = HomeProb, y = AwayProb, colour = Result)) +
+  geom_point(alpha = 0.45, size = 1.5) +
+  facet_wrap(~Type) +
+  scale_colour_manual(
+    values = c("H" = "aquamarine", "D" = "darksalmon", "A" = "deeppink3"),
+    labels = c("H" = "Home win", "D" = "Draw", "A" = "Away win")
+  ) +
+  labs(
+    title = "Actual vs SVM-Predicted Results by Bet365 Odds",
+    x = "Bet365 home-win odds (B365H)",
+    y = "Bet365 away-win odds (B365A)",
+    colour = "Match result"
+  ) +
+  theme_minimal(base_size = 12)
+
+```
+
+
+A boxplot comparing B365D odds before kickoff between matches that actually finished in a draw and matches that didn't:
+
+```{r}
+draw_data <- data.frame(
+  B365D = test_data$B365D,
+  Outcome = factor(
+    ifelse(test_data$FTR == "D", "Draw", "Not a draw"),
+    levels = c("Not a draw", "Draw")
+  )
+)
+```
+
+```{r}
+ggplot(draw_data, aes(x = Outcome, y = B365D, fill = Outcome)) +
+  geom_boxplot(alpha = 0.75, na.rm = TRUE) +
+  scale_fill_manual(
+    values = c("Not a draw" = "brown1", "Draw" = "chartreuse")
+  ) +
+  labs(
+    title = "Bet365 Draw Odds by Actual Match Outcome",
+    x = "Actual match outcome",
+    y = "Bet365 draw odds (B365D)"
+  ) +
+  coord_flip() + 
+  theme_minimal(base_size = 12) +
+  theme(legend.position = "none")
+
+```
+
 
 
 
