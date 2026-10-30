@@ -860,3 +860,29 @@ load("football_svm_environment.RData")
 ```
 
 
+Trying to generate more statistics for the models that underwent cross validation:
+
+```{r}
+#check_folds <- function(tuning_object, n) {
+#  folds <- tuning_object$train.ind
+#
+#  data.frame(
+#    fold = seq_along(folds),
+#    training_n = vapply(folds, length, integer(1)),
+#    test_n = vapply(folds, function(idx) n - length(idx), integer(1)),
+#    indices_valid = vapply(
+#      folds,
+#      function(idx) all(idx >= 1 & idx <= n),
+#      logical(1)
+#    ),
+#    no_duplicate_indices = vapply(
+#      folds,
+#      function(idx) !anyDuplicated(idx),
+#      logical(1)
+#    )
+#  )
+#}
+
+#check_folds(tuned_svm_B$svm_tuning_B, nrow(train_data_B))
+#check_folds(tuned_svm_NB$svm_tuning_NB, nrow(train_data_NB))
+```
