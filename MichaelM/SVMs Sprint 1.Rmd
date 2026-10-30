@@ -626,6 +626,10 @@ multiclass_auc <- pROC::multiclass.roc(
 print(multiclass_auc)
 ```
 
+
+*(Added in later)*
+More complete statistics can be gotten from the predictions using the caret library; for example:
+
 ```{r}
 library(caret)
 ```
@@ -641,6 +645,51 @@ results <- confusionMatrix(
 
 print(results)
 ```
+
+Defining a function that does this:
+
+```{r}
+calculate_metrics <- function(actual, predicted) {
+
+  actual <- factor(actual, levels = c("H", "D", "A"))
+  predicted <- factor(predicted, levels = c("H", "D", "A"))
+
+  cm <- confusionMatrix(
+    data = predicted,
+    reference = actual
+  )
+
+  tab <- cm$table
+
+  precision <- diag(tab) / rowSums(tab)
+  recall <- diag(tab) / colSums(tab)
+
+  f1 <- 2 * precision * recall / (precision + recall)
+
+  overall <- data.frame(
+    Accuracy = as.numeric(cm$overall["Accuracy"]),
+    Kappa = as.numeric(cm$overall["Kappa"]),
+    Macro_Precision = mean(precision, na.rm = TRUE),
+    Macro_Recall = mean(recall, na.rm = TRUE),
+    Macro_F1 = mean(f1, na.rm = TRUE)
+  )
+
+  by_class <- data.frame(
+    Outcome = c("Home win", "Draw", "Away win"),
+    Precision = as.numeric(precision),
+    Recall = as.numeric(recall),
+    F1 = as.numeric(f1)
+  )
+
+  list(
+    confusion_matrix = tab,
+    overall = overall,
+    by_class = by_class
+  )
+}
+```
+
+*(end)*
 
 Next we will plot a bar chart of feature importance to the best performing SVM:
 
@@ -856,33 +905,116 @@ These boxplots looking broadly similar is consistent with the SVM's struggles to
 
 
 ```{r}
+# Used to reload the environment when opening RStudio
 load("football_svm_environment.RData")
 ```
 
-
+*(Added in later)*
 Trying to generate more statistics for the models that underwent cross validation:
 
 ```{r}
-#check_folds <- function(tuning_object, n) {
-#  folds <- tuning_object$train.ind
-#
-#  data.frame(
-#    fold = seq_along(folds),
-#    training_n = vapply(folds, length, integer(1)),
-#    test_n = vapply(folds, function(idx) n - length(idx), integer(1)),
-#    indices_valid = vapply(
-#      folds,
-#      function(idx) all(idx >= 1 & idx <= n),
-#      logical(1)
-#    ),
-#    no_duplicate_indices = vapply(
-#      folds,
-#      function(idx) !anyDuplicated(idx),
-#      logical(1)
-#    )
-#  )
-#}
+generate_oof_predictions <- function(data, predictors, tuning_object,
+                                     cost, gamma) {
 
-#check_folds(tuned_svm_B$svm_tuning_B, nrow(train_data_B))
-#check_folds(tuned_svm_NB$svm_tuning_NB, nrow(train_data_NB))
+  n <- nrow(data)
+  folds <- tuning_object$train.ind
+
+  # Storing one out-of-fold prediction for every observation
+  oof_predictions <- rep(NA_character_, n)
+
+  for (i in seq_along(folds)) {
+
+    # Indices used to fit the model
+    train_indices <- folds[[i]]
+
+    # Indices held out from this fold
+    test_indices <- setdiff(seq_len(n), train_indices)
+
+    # Fitting SVM using the best parameters from the K fold CV
+    fold_model <- svm(
+      FTR ~ .,
+      data = data[train_indices, c("FTR", predictors), drop = FALSE],
+      kernel = "radial",
+      cost = cost,
+      gamma = gamma
+    )
+
+    # Predicting only the held-out observations
+    oof_predictions[test_indices] <- as.character(
+      predict(
+        fold_model,
+        newdata = data[test_indices, predictors, drop = FALSE]
+      )
+    )
+
+    cat("Completed fold", i, "of", length(folds), "\n")
+  }
+
+  factor(oof_predictions, levels = c("H", "D", "A"))
+}
+
 ```
+
+Generating out of fold predictions for both models:
+
+```{r}
+set.seed(123)
+
+oof_predictions_B <- generate_oof_predictions(
+  data = train_data_B,
+  predictors = selected_predictors_B,
+  tuning_object = tuned_svm_B$svm_tuning_B,
+  cost = tuned_svm_B$best_parameters_B$cost,
+  gamma = tuned_svm_B$best_parameters_B$gamma
+)
+
+saveRDS(oof_predictions_B, "../MichaelM/oof_predictions_B.rds")
+
+```
+
+```{r}
+set.seed(123)
+
+oof_predictions_NB <- generate_oof_predictions(
+  data = train_data_NB,
+  predictors = selected_predictors_NB,
+  tuning_object = tuned_svm_NB$svm_tuning_NB,
+  cost = tuned_svm_NB$best_parameters_NB$cost,
+  gamma = tuned_svm_NB$best_parameters_NB$gamma
+)
+
+saveRDS(oof_predictions_NB, "../MichaelM/oof_predictions_NB.rds")
+```
+
+```{r}
+metrics_B <- calculate_metrics(
+  actual = train_data_B$FTR,
+  predicted = oof_predictions_B
+)
+
+metrics_NB <- calculate_metrics(
+  actual = train_data_NB$FTR,
+  predicted = oof_predictions_NB
+)
+```
+
+```{r}
+# Overall statistics
+metrics_B$overall
+metrics_NB$overall
+```
+
+```{r}
+# Class-specific statistics
+metrics_B$by_class
+metrics_NB$by_class
+```
+
+```{r}
+# Confusion matrices
+metrics_B$confusion_matrix
+metrics_NB$confusion_matrix
+```
+
+
+
