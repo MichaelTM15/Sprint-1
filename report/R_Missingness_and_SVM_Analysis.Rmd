@@ -7,6 +7,8 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+```
+```{r}
 setwd("~/GitHub/Sprint-0/MichaelM")
 ```
 
@@ -144,6 +146,7 @@ nrow(train_data_B)
 
 Again for now we are fine to use this as training data without imputation, but we will do imputation later.
 
+
 **2. Fitting the Baseline SVM models**
 
 Now we can train an SVM for each training dataset. First the Non-Betting model:
@@ -173,18 +176,21 @@ calculate_metrics <- function(actual, predicted) {
   actual <- factor(actual, levels = c("H", "D", "A"))
   predicted <- factor(predicted, levels = c("H", "D", "A"))
 
+  # Getting confusion matrix and other metrics using caret package
   cm <- confusionMatrix(
     data = predicted,
     reference = actual
   )
-
+  
   tab <- cm$table
-
+  
+  # Calculating precision, recall and F1 score for each outcome using their formulas
   precision <- diag(tab) / rowSums(tab)
   recall <- diag(tab) / colSums(tab)
 
   f1 <- 2 * precision * recall / (precision + recall)
 
+  # Gives macro (unweighted mean) of each metric
   overall <- data.frame(
     Accuracy = as.numeric(cm$overall["Accuracy"]),
     Kappa = as.numeric(cm$overall["Kappa"]),
@@ -193,6 +199,7 @@ calculate_metrics <- function(actual, predicted) {
     Macro_F1 = mean(f1, na.rm = TRUE)
   )
 
+  # Metrics for each individual outcome
   by_class <- data.frame(
     Outcome = c("Home win", "Draw", "Away win"),
     Precision = as.numeric(precision),
@@ -248,8 +255,184 @@ baseline_training_metrics_B$by_class
 baseline_training_metrics_B$confusion_matrix
 ```
 
+Note for reference that Precision measures the proportion of actually correct predictions of a class that the SVM made out of all the times it predicted that class. Meanwhile Recall measures the proportion of the correct predictions of a class out of all the datapoints with that class, and F1 (score) is a combined metric of Precision and Recall for each class.
+
+'Kappa' is Cohen's Kappa - an overall metric with formula
+$$
+\kappa = \frac{p_o-p_e}{1-p_e}
+$$
+where $p_o$ is the observed agreement - the proportion of datapoints for which the model predicted the same class that the data point is (i.e the accuracy in this case), and $p_e$ is the expected chance agreement - the probability that the model would predict the same class that the data point is by chance (i.e. by the individual proportions of each class in the data in this case).
+
+From the American National Institute of Health, a suggestive scale to interpret this was proposed by Cohen:
+"Cohen suggested the Kappa result be interpreted as follows: values ≤ 0 as indicating no agreement and 0.01–0.20 as none to slight, 0.21–0.40 as fair, 0.41– 0.60 as moderate, 0.61–0.80 as substantial, and 0.81–1.00 as almost perfect agreement." 
+(Source: https://pmc.ncbi.nlm.nih.gov/articles/PMC3900052/, Author: Mary L McHugh, Date: 15/10/2012)
+
+Although the specific boundaries of this scale are critiqued in the same article for being too lenient (in particular referring to use in healthcare), this gives a general sense of how the Kappa score's value (between -1 and 1) relates to better models.
+
+We have a slight idea now of how the SVMs are doing with this classification, though we will have to dig deeper into this by performing Cross Validation before drawing any conclusions.
+
+
+**3. Finding the Strongest Models through K-fold Cross Validation, and CV Performance Comparison**3
+
+Here we perform 5-Fold Cross Validation to get the best combination of parameter values for 'cost' and 'gamma'. 
+We loop through 3 values of each: for cost 0.5, 2, and 8; for gamma 0.01, 0.05 and 0.2 therefore 9 combinations.
+Unfortunately over 5 folds this leaves us with 45 SVMs to fit for both Betting and Non-Betting datasets (so 90 total), which takes a long time to run but is just about doable over a full day.
+
+If it was feasible, more parameter values would have been tried. In order to avoid having to run this extremely computationally expensive operation each time the file was run through; the final, best performing SVM model for both cases was saved in an RDS file in my named folder for easy access. The code that was originally run is below, but turned into a comment(s).
+
 ```{r}
-load("C:/Users/micha/OneDrive/Documents/report_svm_environment.RData")
+# Initializing with a given seed in order to be repeatable
+
+#set.seed(123)
+#svm_tuning_NB<-tune(svm, FTR~., data=train_data_NB[, c("FTR", selected_predictors_NB)],
+ #                       kernel="radial", ranges=list(cost=c(0.5,2,8), gamma=c(0.01,0.05,0.2)),
+  #                      tunecontrol=tune.control(cross=5))
+
+#best_parameters_NB<-svm_tuning_NB$best.parameters
+#best_svm_NB<-svm_tuning_NB$best.model
+
+#saveRDS(list(
+ # best_svm_NB=best_svm_NB,
+  #best_parameters_NB=best_parameters_NB,
+  #svm_tuning_NB=svm_tuning_NB
+  #), 
+  #"../MichaelM/best_svm_model_NB.rds")
+```
+
+```{r}
+# Repeating for the model with the B365 variables:
+
+#set.seed(123)
+#svm_tuning_B<-tune(svm, FTR~., data=train_data_B[, c("FTR", selected_predictors_B)],
+ #                       kernel="radial", ranges=list(cost=c(0.5,2,8), gamma=c(0.01,0.05,0.2)),
+  #                      tunecontrol=tune.control(cross=5))
+
+#best_parameters_B<-svm_tuning_B$best.parameters
+#best_svm_B<-svm_tuning_B$best.model
+
+#saveRDS(list(
+ # best_svm_B=best_svm_B,
+  #best_parameters_B=best_parameters_B,
+  #svm_tuning_B=svm_tuning_B
+  #), 
+  #"../MichaelM/best_svm_model_B.rds")
+```
+
+Extracting the tuned SVMs from their locations:
+
+```{r}
+tuned_svm_NB<-readRDS("../MichaelM/best_svm_model_NB.rds")
+tuned_svm_B<-readRDS("../MichaelM/best_svm_model_B.rds")
+
+best_svm_NB<-tuned_svm_NB$best_svm_NB
+best_svm_B<-tuned_svm_B$best_svm_B
+
+best_parameters_NB<-tuned_svm_NB$best_parameters_NB
+best_parameters_B<-tuned_svm_B$best_parameters_B
+```
+
+Checking the best parameter values:
+
+```{r}
+best_parameters_NB
+```
+```{r}
+best_parameters_B
+```
+
+They both ended up using the same value of gamma (which was the smallest), but the best Betting SVM used a smaller value of cost than the best Non-Betting SVM. 
+
+We can also check their performance; i.e. the best performance across the 5-fold Cross Validation:
+
+```{r}
+tuned_svm_NB$svm_tuning_NB$best.performance
+```
+```{r}
+tuned_svm_B$svm_tuning_B$best.performance
+```
+
+These give the CV Error, which is equal to 1 minus the Accuracy. Hence we can see that the Betting Model had a slightly higher Accuracy during the cross validation.
+
+We would like to get further metrics for the best performing models from the cross validation, however getting these independently of the original CV process would have required us to have used Nested CV, which was simply too computationally expensive to run. Thus as a compromise we will generate Out-Of-Fold predictions using both models with their 'best parameters'. This is not a representation of what was actually generated in the 5-fold CV, but will serve as a useful, additional experiment to compare the two.
+
+First creating a function to generate the Out-Of-Fold predictions:
+
+```{r}
+generate_oof_predictions <- function(data, predictors, tuning_object,
+                                     cost, gamma) {
+
+  n <- nrow(data)
+  folds <- tuning_object$train.ind
+
+  # Storing one out-of-fold prediction for every observation
+  oof_predictions <- rep(NA_character_, n)
+
+  for (i in seq_along(folds)) {
+
+    # Indices used to fit the model
+    train_indices <- folds[[i]]
+
+    # Indices held out from this fold
+    test_indices <- setdiff(seq_len(n), train_indices)
+
+    # Fitting SVM using the best parameters from the K fold CV
+    fold_model <- svm(
+      FTR ~ .,
+      data = data[train_indices, c("FTR", predictors), drop = FALSE],
+      kernel = "radial",
+      cost = cost,
+      gamma = gamma
+    )
+
+    # Predicting only the held-out observations
+    oof_predictions[test_indices] <- as.character(
+      predict(
+        fold_model,
+        newdata = data[test_indices, predictors, drop = FALSE]
+      )
+    )
+
+    cat("Completed fold", i, "of", length(folds), "\n")
+  }
+
+  factor(oof_predictions, levels = c("H", "D", "A"))
+}
+```
+
+Now generating OOF predictions for each model - like with the 5-fold CV, I saved it to an RDS file to prevent it from having to run each time the file was run (though it's not quite as long). Consequently I've put the original code but as a comment(s).
+
+```{r}
+#set.seed(123)
+
+#oof_predictions_B <- generate_oof_predictions(
+#  data = train_data_B,
+#  predictors = selected_predictors_B,
+#  tuning_object = tuned_svm_B$svm_tuning_B,
+#  cost = tuned_svm_B$best_parameters_B$cost,
+#  gamma = tuned_svm_B$best_parameters_B$gamma
+#)
+
+#saveRDS(oof_predictions_B, "../MichaelM/oof_predictions_B.rds")
+```
+
+```{r}
+#set.seed(123)
+
+#oof_predictions_NB <- generate_oof_predictions(
+#  data = train_data_NB,
+#  predictors = selected_predictors_NB,
+#  tuning_object = tuned_svm_NB$svm_tuning_NB,
+#  cost = tuned_svm_NB$best_parameters_NB$cost,
+#  gamma = tuned_svm_NB$best_parameters_NB$gamma
+#)
+
+#saveRDS(oof_predictions_NB, "../MichaelM/oof_predictions_NB.rds")
+```
+
+
+```{r}
+#save.image(file = "C:/Users/micha/OneDrive/Documents/report_svm_environment.RData")
+#load("C:/Users/micha/OneDrive/Documents/report_svm_environment.RData")
 ```
 
 
