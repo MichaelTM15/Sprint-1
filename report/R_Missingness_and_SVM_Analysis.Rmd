@@ -255,21 +255,21 @@ baseline_training_metrics_B$by_class
 baseline_training_metrics_B$confusion_matrix
 ```
 
-Note for reference that Precision measures the proportion of actually correct predictions of a class that the SVM made out of all the times it predicted that class. Meanwhile Recall measures the proportion of the correct predictions of a class out of all the datapoints with that class, and F1 (score) is a combined metric of Precision and Recall for each class.
+Note for reference that Precision for a given class measures the proportion of predictions of that class the SVM made that were actually correct. Meanwhile Recall measures the proportion of the correct predictions of a class out of all the datapoints actually with that class, and F1 (score) is a combined metric of Precision and Recall for each class.
 
 'Kappa' is Cohen's Kappa - an overall metric with formula
 $$
 \kappa = \frac{p_o-p_e}{1-p_e}
 $$
-where $p_o$ is the observed agreement - the proportion of datapoints for which the model predicted the same class that the data point is (i.e the accuracy in this case), and $p_e$ is the expected chance agreement - the probability that the model would predict the same class that the data point is by chance (i.e. by the individual proportions of each class in the data in this case).
+where $p_o$ is the observed agreement - the proportion of datapoints for which the model predicted the same class that the data point is (i.e the accuracy in this case), and $p_e$ is the expected chance agreement - the probability that the model would predict the same class that the data point is by chance (calculated by using the individual proportions of each class in the dataset).
 
-From the American National Institute of Health, a suggestive scale to interpret this was proposed by Cohen:
+From the American National Institutes of Health, a suggestive scale to interpret this was proposed by Cohen:
 "Cohen suggested the Kappa result be interpreted as follows: values ≤ 0 as indicating no agreement and 0.01–0.20 as none to slight, 0.21–0.40 as fair, 0.41– 0.60 as moderate, 0.61–0.80 as substantial, and 0.81–1.00 as almost perfect agreement." 
 (Source: https://pmc.ncbi.nlm.nih.gov/articles/PMC3900052/, Author: Mary L McHugh, Date: 15/10/2012)
 
 Although the specific boundaries of this scale are critiqued in the same article for being too lenient (in particular referring to use in healthcare), this gives a general sense of how the Kappa score's value (between -1 and 1) relates to better models.
 
-We have a slight idea now of how the SVMs are doing with this classification, though we will have to dig deeper into this by performing Cross Validation before drawing any conclusions.
+We have a slight idea now of how the SVMs are doing with this classification (the performance shown by the metrics might be a bit optimistic as the SVMs were trained on the same datasets that they are being assessed on), though we will have to dig deeper into this by performing Cross Validation before drawing any conclusions.
 
 
 **3. Finding the Strongest Models through K-fold Cross Validation, and CV Performance Comparison**3
@@ -428,6 +428,67 @@ Now generating OOF predictions for each model - like with the 5-fold CV, I saved
 
 #saveRDS(oof_predictions_NB, "../MichaelM/oof_predictions_NB.rds")
 ```
+
+Extracting the OOF predictions for each model:
+
+```{r}
+oof_predictions_B<-readRDS("../MichaelM/oof_predictions_B.rds")
+oof_predictions_NB<-readRDS("../MichaelM/oof_predictions_NB.rds")
+```
+
+and calculating the metrics:
+
+```{r}
+oof_metrics_B <- calculate_metrics(
+  actual = train_data_B$FTR,
+  predicted = oof_predictions_B
+)
+
+oof_metrics_NB <- calculate_metrics(
+  actual = train_data_NB$FTR,
+  predicted = oof_predictions_NB
+)
+```
+
+Now comparing:
+
+Overall statistics
+
+```{r}
+oof_metrics_B$overall
+```
+```{r}
+oof_metrics_NB$overall
+```
+
+Class-specific statistics
+
+```{r}
+oof_metrics_B$by_class
+```
+```{r}
+oof_metrics_NB$by_class
+```
+
+Confusion matrices
+
+```{r}
+oof_metrics_B$confusion_matrix
+```
+```{r}
+oof_metrics_NB$confusion_matrix
+```
+
+As we can see the reported OOF Accuracy is very similar to the actual CV Accuracy, which supports the use of these metrics in model selection.
+
+From before, the Betting model's original CV accuracy is slightly higher than the Non-Betting model's. The OOF predictions' metrics are consistent with this - not only higher in accuracy, but also Macro Precision, Macro Recall, Macro F1 score and Cohen's Kappa.
+
+The class-specific statistics and the confusion matrices do reveal that the Betting model wasn't entirely dominant in its OOF predictions - the Non-Betting model predicted more Home wins correctly, which lead to it having a higher Home win Recall. However, this can be attributed to it just predicting a Home win more for every class.
+
+Furthermore, the overall pattern was similar in both. In particular they were both extremely weak at classifying Draws correctly from the pool of data that were Draws - both floating around 10-11% Draw Recall. Their Precision when they did predict a Draw was also lower than corresponding Home/Away win Precision but not by as large a margin. In contrast, both model's best scoring metric relatively was the Home win Recall.
+
+While the differences in the OOF prediction metrics, as well as the difference in actual CV accuracy, are small, in combination the evidence points towards the best Betting SVM as our choice of model.
+
 
 
 ```{r}
