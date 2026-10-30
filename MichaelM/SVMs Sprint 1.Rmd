@@ -11,7 +11,7 @@ setwd("~/GitHub/Sprint-0/MichaelM")
 ```
 
 
-*In this file I check performance of each model on the test data to see if everything's working - the results weren't considered for the actual model selection in the report*
+*In this file I check performance of each model on the test data to see if everything's working and I write down some observations as notes - the results weren't considered for the actual model selection in the report*
 
 Importing the data:
 
