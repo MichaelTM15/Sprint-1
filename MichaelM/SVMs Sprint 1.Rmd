@@ -10,6 +10,9 @@ knitr::opts_chunk$set(echo = TRUE)
 setwd("~/GitHub/Sprint-0/MichaelM")
 ```
 
+
+*In this file I check performance of each model on the test data to see if everything's working - the results weren't considered for the actual model selection in the report*
+
 Importing the data:
 
 ```{r}
@@ -85,15 +88,12 @@ which should work:
 ```{r}
 sum(colSums(is.na(train_data_NB[, predictors, drop = FALSE])) == 0)
 selected_predictors_NB
-```
 
-
-```{r}
 nrow(train_data_NB)
 nrow(test_data)
 ```
 
-Now onto fitting an SVM:
+**Now onto fitting an SVM:**
 
 ```{r}
 # Making outcome into a factor variable:

@@ -7,24 +7,257 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+setwd("~/GitHub/Sprint-0/MichaelM")
 ```
 
-## R Markdown
+*Packages to load*
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
-
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
-
-```{r cars}
-summary(cars)
+```{r}
+library(e1071)
+library(caret)
+library(mice)
+library(pROC)
+library(ggplot2)
+library(patchwork)
 ```
 
-## Including Plots
+**1. Data Pre-Processing and Missingness Analysis**
 
-You can also embed plots, for example:
+Firstly we import the test and training data that was left after the EDA:
 
-```{r pressure, echo=FALSE}
-plot(pressure)
+```{r}
+train_data<-read.csv("../processed-data/football_train_data.csv")
+test_data<-read.csv("../processed-data/football_test_data.csv")
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+Finding the number of rows:
+
+```{r}
+nrow(train_data)
+nrow(test_data)
+```
+
+Now we check which predictors have no missing variables:
+
+```{r}
+# Pulling out the predictor variables from the outcome
+predictors<-setdiff(names(train_data), "FTR")
+
+selected_predictors <- predictors[
+    colSums(is.na(train_data[, predictors, drop = FALSE])) == 0
+]
+
+selected_predictors
+```
+
+This means that all predictors have at least one row with missing values, which is a problem.
+It seems odd for the simple match statistics to have missing values - let's just check the extent of it:
+
+```{r}
+# Seeing which rows have missing values of Away Shots on Target
+which(is.na(train_data$AST))
+```
+
+After personally inspecting the Excel file, this row seems to have N/A for all of the match statistics.
+Removing it and inspecting for missingness:
+
+```{r}
+train_data1<-train_data[-8808,]
+sum(colSums(is.na(train_data1[, predictors, drop = FALSE])) == 0)
+```
+
+Now 10 predictors have no missing values - slightly lower than expected of 12 match statistics.
+Looking at which were fine:
+
+```{r}
+selected_predictors1 <- predictors[
+    colSums(is.na(train_data1[, predictors, drop = FALSE])) == 0
+]
+selected_predictors1
+```
+
+AF and HF are the only two match statistics missing. Investigating:
+
+```{r}
+which(is.na(train_data$AF))
+which(is.na(train_data$HF))
+```
+
+So now for a NON-Betting Model we can use the training data without these 3 rows: (for now we aren't going to do any imputation as it isn't strictly necessary when we still have 37821 observations)
+
+```{r}
+train_data_NB<-train_data[-c(8808,32940,32949),]
+selected_predictors_NB<- predictors[
+    colSums(is.na(train_data_NB[, predictors, drop = FALSE])) == 0
+]
+```
+
+Just checking again that this works:
+
+```{r}
+sum(colSums(is.na(train_data_NB[, predictors, drop = FALSE])) == 0)
+selected_predictors_NB
+nrow(train_data_NB)
+```
+
+Next we will further examine missingness in order to get a training dataset that we can use for a Betting Odds Model:
+
+```{r}
+# We've already checked for the (non-betting) match statistics
+odds_var<-setdiff(names(train_data), selected_predictors_NB)
+
+missingness <- data.frame(
+  Variable = odds_var,
+  Missing_N = sapply(train_data[odds_var], function(x) sum(is.na(x))),
+  Missing_Percent = sapply(
+    train_data[odds_var],
+    function(x) mean(is.na(x)) * 100
+  )
+)
+
+missingness <- missingness[
+  order(-missingness$Missing_Percent),
+]
+```
+
+Checking the table:
+
+```{r}
+missingness
+```
+
+Unfortunately it seems that a vast majority of the values for the betting odds are missing. However the Bet365 variables (for Home win, Draw, Away win) have only 0.024% missingness. Investigating where:
+
+```{r}
+which(is.na(train_data$B365A))
+which(is.na(train_data$B365D))
+which(is.na(train_data$B365H))
+```
+
+So only 9 more rows with missing values (none overlapping with the match statistics). For the Betting Model we will use the training data without these rows as well as the previous 3 rows we found:
+
+```{r}
+train_data_B<-train_data_NB[complete.cases(train_data_NB[, c("B365H", "B365D", "B365A")]),]
+selected_predictors_B<-unique(c(selected_predictors_NB, "B365H", "B365D", "B365A"))
+nrow(train_data_B)
+```
+
+Again for now we are fine to use this as training data without imputation, but we will do imputation later.
+
+**2. Fitting the Baseline SVM models**
+
+Now we can train an SVM for each training dataset. First the Non-Betting model:
+
+```{r}
+# First converting the result to a factor variable
+train_data_NB$FTR<-factor(train_data_NB$FTR, levels=c("H", "D", "A"))
+
+# Fitting with default values of the parameters
+baseline_svm_model_NB<-svm(FTR~., data=train_data_NB[, c("FTR", selected_predictors_NB)],
+               kernel="radial", cost=1, gamma=1/length(selected_predictors_NB), scale=TRUE)
+```
+
+and the Betting model:
+
+```{r}
+train_data_B$FTR<-factor(train_data_B$FTR, levels=c("H", "D", "A"))
+baseline_svm_model_B<-svm(FTR~., data=train_data_B[, c("FTR", selected_predictors_B)],
+                 kernel="radial", cost=1, gamma=1/length(selected_predictors_B), scale=TRUE)
+```
+
+For a preliminary check, we can look at metrics such as the confusion matrix, accuracy, precision ,recall, F1 score etc. on the training sets of each. First defining a function that can do this:
+
+```{r}
+calculate_metrics <- function(actual, predicted) {
+
+  actual <- factor(actual, levels = c("H", "D", "A"))
+  predicted <- factor(predicted, levels = c("H", "D", "A"))
+
+  cm <- confusionMatrix(
+    data = predicted,
+    reference = actual
+  )
+
+  tab <- cm$table
+
+  precision <- diag(tab) / rowSums(tab)
+  recall <- diag(tab) / colSums(tab)
+
+  f1 <- 2 * precision * recall / (precision + recall)
+
+  overall <- data.frame(
+    Accuracy = as.numeric(cm$overall["Accuracy"]),
+    Kappa = as.numeric(cm$overall["Kappa"]),
+    Macro_Precision = mean(precision, na.rm = TRUE),
+    Macro_Recall = mean(recall, na.rm = TRUE),
+    Macro_F1 = mean(f1, na.rm = TRUE)
+  )
+
+  by_class <- data.frame(
+    Outcome = c("Home win", "Draw", "Away win"),
+    Precision = as.numeric(precision),
+    Recall = as.numeric(recall),
+    F1 = as.numeric(f1)
+  )
+
+  list(
+    confusion_matrix = tab,
+    overall = overall,
+    by_class = by_class
+  )
+}
+```
+
+and then making predictions using the training datasets:
+
+```{r}
+baseline_training_predictions_NB<-predict(baseline_svm_model_NB, newdata=train_data_NB[, selected_predictors_NB, drop=FALSE])
+baseline_training_predictions_B<-predict(baseline_svm_model_B, newdata=train_data_B[, selected_predictors_B, drop=FALSE])
+```
+
+Now we can view the performance metrics of this preliminary check:
+
+```{r}
+baseline_training_metrics_NB<-calculate_metrics(actual=train_data_NB$FTR,
+                                                predicted = baseline_training_predictions_NB)
+baseline_training_metrics_B<-calculate_metrics(actual=train_data_B$FTR,
+                                               predicted = baseline_training_predictions_B)
+```
+
+First let's see the training performance of the Non-Betting model:
+
+```{r}
+baseline_training_metrics_NB$overall
+```
+```{r}
+baseline_training_metrics_NB$by_class
+```
+```{r}
+baseline_training_metrics_NB$confusion_matrix
+```
+
+and now the Betting model:
+
+```{r}
+baseline_training_metrics_B$overall
+```
+```{r}
+baseline_training_metrics_B$by_class
+```
+```{r}
+baseline_training_metrics_B$confusion_matrix
+```
+
+```{r}
+load("C:/Users/micha/OneDrive/Documents/report_svm_environment.RData")
+```
+
+
+
+
+
+
+
+
+
+
