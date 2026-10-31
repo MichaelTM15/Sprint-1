@@ -766,10 +766,99 @@ heatmap.2(
 )
 ```
 
-Unsurprisingly the pairs of predictors with the highest positive correlation were between Shots/Shots on Target, Fouls/Yellows, Fouls/Reds for both Home and Away. The largest negative correlation was between the Bet365 Home/Away opening odds. Interestingly, the Draw odds seem more varied - they had strong positive correlation with the Away win odds, but quite weak negative correlation with those for Home wins. 
+Unsurprisingly the pairs of predictors with the highest positive correlation were between Shots/Shots on Target, Fouls/Yellows, Fouls/Reds for both Home and Away. The largest negative correlation was between the Bet365 Home/Away opening odds. Interestingly, the Draw odds seemed more varied - they had strong positive correlation with the Away win odds, but quite weak negative correlation with those for Home wins. 
 
-Next let's focus in on the 
+Next let's focus in on the importance of each predictor. We can measure importance by checking how much the accuracy of the SVM's predictions changes when randomly shuffling the values for each of the variables at a time (with a set seed). The more the accuracy decreases after shuffling, the more important the predictor. 
 
+Calculating the importance scores for each predictor:
+
+```{r}
+baseline_accuracy<-mean(test_predictions==actual)
+# 'actual' is the same as for the ROC curve - the Full Time Results of the test data
+set.seed(123)
+
+importance_scores <- numeric(length(selected_predictors_B))
+names(importance_scores) <- selected_predictors_B
+
+for (variable in selected_predictors_B) {
+  shuffled_test <- test_data[, selected_predictors_B, drop=FALSE]
+  
+  # Shuffling the values of the variable 
+  shuffled_test[[variable]] <- sample(shuffled_test[[variable]])
+  
+  # Making predictions with the shuffled variables in the data and calculating the accuracy
+  shuffled_predictions <- predict(best_svm_B_prob, newdata = shuffled_test)
+  shuffled_accuracy <- mean(shuffled_predictions == actual)
+  
+  # Calculating the change in accuracy after shuffling - the importance score of each variable
+  importance_scores[variable] <- baseline_accuracy - shuffled_accuracy
+}
+```
+
+Now we can plot a bar chart of feature importance to the best performing SVM:
+
+```{r}
+# Putting the scores in order
+importance_scores <- sort(importance_scores, decreasing = TRUE)
+
+par(mar = c(5,9,4,2), mgp = c(4,1,0))
+
+barplot(importance_scores, horiz = TRUE, las = 1, border = NA, col = "steelblue",
+        main = "Permutation Importance for the Best Betting Odds SVM",
+        xlab = "Decrease in test accuracy when left out",
+        ylab = "Predictor",
+        xlim = c(-0.01, 0.08),
+        xaxt = "n", cex.names = 0.85, cex.axis = 0.85, cex.lab = 0.95, cex.main = 1)
+
+axis(side = 1, at = seq(-0.01, 0.08, by = 0.01), labels = sprintf("%.2f", seq(-0.01, 0.08, by = 0.01)))
+abline(v = 0, lty = 2)
+```
+
+From this we can see that Home and Away Shots on Target were found to have the biggest impact on the accuracy when shuffled - about a 7-7.5% decrease. This was followed by the Bet365 Home and Away win odds, though curiously in the opposite order. On the opposite end, the number of fouls and yellow cards of each team being shuffled actually increased the test accuracy; suggesting these were almost useless for prediction.
+
+Zoning in on the most important predictors (AST, HST, B365H and B365A), we want to see how the predicted and actual outcomes are spread out across them. It makes sense to first do a comparison between AST and HST, which we will show using scatter plots:
+
+```{r}
+# Creating the tables of values of HST and AST with the actual and predicted outcomes
+ST_actual <- data.frame(HST = test_data$HST, AST = test_data$AST,
+                        Result = factor(test_data$FTR, levels = c("H", "D", "A")),
+                        Type = "Actual Result")
+ST_predicted <- data.frame(HST = test_data$HST, AST = test_data$AST,
+                           Result = factor(test_predictions, levels = c("H", "D", "A")),
+                           Type = "SVM prediction")
+
+ST_compare <- rbind(ST_actual, ST_predicted)
+```
+
+and now putting the scatter plots side by side:
+
+```{r}
+ggplot(ST_compare, aes(x = HST, y = AST, colour = Result)) +
+  geom_jitter(width = 0.2, height = 0.2, alpha = 0.45, size = 1.5) +
+  facet_wrap(~Type) +
+  scale_colour_manual(
+    values = c("H" = "cornflowerblue", "D" = "darkorange", "A" = "firebrick"),
+    labels = c("H" = "Home win", "D" = "Draw", "A" = "Away win")
+  ) +
+  geom_abline(
+  slope = 1,
+  intercept = 0,
+  linetype = "dashed",
+  colour = "grey30",
+  linewidth = 0.8
+  ) +
+  labs(
+    title = "Actual vs SVM-Predicted Match Results",
+    x = "Home-team shots on target (HST)",
+    y = "Away-team shots on target (AST)",
+    colour = "Match result"
+  ) +
+  theme_minimal(base_size = 12)
+```
+
+These are split with a diagonal line where the number of home/away shots on target are equal, and being above/below the line corresponds to more away/home shots on target, respectively. From this we can see that the SVM predicted quite rigidly whichever team had more shots on target. That is not to say the SVM went solely by this principle, as there are some noticeable exceptions seen in the scatter graph - however, while the actual results have a similar trend, it is more mixed, particularly around the separating line. 
+
+We will now 
 
 
 ```{r}
