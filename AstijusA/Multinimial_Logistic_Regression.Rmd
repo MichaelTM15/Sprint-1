@@ -1,6 +1,6 @@
 ---
-title: "Multinomial Logistic Regression: Lower-League Training to Premier League Test"
-subtitle: "Group project - multinomial regression section"
+title: "Multinomial Logistic Regression"
+subtitle: "Sprint1 - Astijus Armonavicius"
 output:
   pdf_document:
     toc: true
@@ -12,7 +12,6 @@ output:
 ---
 
 ```{r setup, include=FALSE}
-# Keep the report readable, but do not hide warnings from model fitting.
 knitr::opts_chunk$set(
   echo = TRUE,
   message = FALSE,
@@ -22,19 +21,17 @@ knitr::opts_chunk$set(
   fig.height = 5
 )
 
-library(nnet)  # multinomial logistic regression
-library(MASS)  # AIC-based stepwise selection
-library(pROC)  # ROC curves and AUC
-library(knitr) # clean tables in the report
+library(nnet)  
+library(MASS)  
+library(pROC)  
+library(knitr) 
 library(corrplot)
 library(ggplot2)
 
-set.seed(42)  # make the cross-validation splits reproducible
+set.seed(123)  
 ```
 
 # 1. Introduction and data cleaning
-
-Can a model trained on lower-league football classify Premier League results? We use match statistics, excluding goals and the half-time result.
 
 Multinoimial regression contributes three things other methods cannot:
 
@@ -69,7 +66,7 @@ outcome_levels <- c("D", "A", "H")
 
 We remove rows with missing outcomes or missing values in the 12 match statistics. This keeps model comparisons on the same matches. It may introduce bias if missingness is related to the match or league.
 
-I also create **differences** (home minus away) and **totals** (home plus away). The difference describes which side has the advantage and the total describes overall magnitude during the match.
+We also create differences (home minus away) and totals (home plus away). The difference describes which side has the advantage and the total describes the overall output during the match.
 
 ```{r clean-data}
 
@@ -78,20 +75,19 @@ prepare_matches <- function(data, predictors) {
   # Keep the original row number so predictions can be matched across models.
   data$source_row <- seq_len(nrow(data))
 
-  # Use the same complete cases for all models in this experiment.
   keep <- complete.cases(data[, c("FTR", predictors), drop = FALSE])
   data <- data[keep, , drop = FALSE]
 
-  # Remove results that are not H, D or A and set a fixed class order.
+  # Remove results that are not H, D or A and set a fixed class order
   data$FTR <- factor(data$FTR, levels = outcome_levels)
   data <- data[!is.na(data$FTR), , drop = FALSE]
 
-  # Differences: positive means the home team had the larger count.
+  # Differences
   data$d_sot <- data$HST - data$AST
   data$d_shots <- data$HS - data$AS
   data$d_corners <- data$HC - data$AC
 
-  # Totals: a rough measure of overall match activity.
+  # Totals
   data$t_sot <- data$HST + data$AST
   data$t_shots <- data$HS + data$AS
   data$t_corners <- data$HC + data$AC
@@ -99,7 +95,7 @@ prepare_matches <- function(data, predictors) {
   data
 }
 
-# Main data: same 12-statistic complete-case rule for train and test.
+# Main data
 train_main <- prepare_matches(train_raw, stats_all)
 test_main <- prepare_matches(test_raw, stats_all)
 
