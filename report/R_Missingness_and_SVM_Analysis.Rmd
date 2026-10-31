@@ -712,6 +712,9 @@ macro_auc<-mean(c(auc(roc_H), auc(roc_D), auc(roc_A)))
 
 plot(roc_H, col = "blue",
      xlim = c(1.0, 0.0),
+     ylim = c(0.0, 1.0),
+     xaxs = "i",
+     yaxs = "i",
      main = "ROC Curves - Best SVM with Betting Odds")
 plot(roc_D, col = "green", add = TRUE)
 plot(roc_A, col = "red", add = TRUE)
@@ -732,19 +735,18 @@ legend(
 )
 ```
 
-Here the Macro-average AUC is a combined metric of each of the 3 calculated AUCs, just by taking the (unweighted) mean. Another, different, overall measurement that serves the same purpose is the multi-class AUC:
+Here the Macro-average AUC is a combined metric of each of the 3 calculated AUCs, just by taking the (unweighted) mean. Another, different, overall measurement that serves the same purpose is the Multi-class AUC:
 
 ```{r}
 multiclass_auc <- pROC::multiclass.roc(response = actual, predictor = prob_B)
 print(multiclass_auc)
 ```
 
-Either can be used but they take different assumptions - the macro AUC gives each outcome the same importance weighting, while the multi-class AUC adjusts for the proportions of the outcomes in the data.
+Either can be used but they are calculated differently. The Macro-average AUC gives each outcome the same weighting and averages each of their one-vs-rest AUCs. Meanwhile the Multi-class AUC uses the pairwise AUCs (not on the graph) for each combination of outcomes and averages between them.  
 
-From the ROC curves, we can see that while obviously the Draw outcome had the lowest AUC, the highest AUC was actually for Away wins. This differs from the hierarchy established by the class-specific Recall, Precision and F1 scores - where the Home win was king. This suggests that the Home win probabilities calculated by the SVM don't cause it to decide on this classification throughout all probability thresholds as often as the Away win probabilities do for that classification.
+From the ROC curves, we can see that while obviously the Draw outcome had the lowest AUC, the highest AUC was actually for Away wins. This differs from the hierarchy established by the class-specific Recall, Precision and F1 scores, where Home win was king. This suggests that although the SVM had more success classifying Home wins at its own probability decision threshold, the prediction probabilities it calculated were overall better - when going over all thresholds - at distinguishing Away wins from the other outcomes. 
 
-
-We would like to further investigate the importance of the selected predictors. Before that, we will first create a heatmap to see what relationships they have with each other:
+We would like to further investigate the importance of the selected predictors. Before we begin, we will first create a heatmap to see the relationships they have with each other:
 
 ```{r}
 predictor_correlations <- cor(train_data_B[, selected_predictors_B, drop=FALSE], use = "pairwise.complete.obs")
@@ -764,7 +766,7 @@ heatmap.2(
 )
 ```
 
-Unsurprisingly the pairs of predictors with the highest positive correlation were between Shots/Shots on Target, Fouls/Yellows, Fouls/Reds for both Home and Away. The largest negative correlation was between the Bet365 Home/Away opening odds. Interestingly, the Draw odds had strong positive correlation with the Away win odds, but quite weak negative correlation with those for Home wins. 
+Unsurprisingly the pairs of predictors with the highest positive correlation were between Shots/Shots on Target, Fouls/Yellows, Fouls/Reds for both Home and Away. The largest negative correlation was between the Bet365 Home/Away opening odds. Interestingly, the Draw odds seem more varied - they had strong positive correlation with the Away win odds, but quite weak negative correlation with those for Home wins. 
 
 Next let's focus in on the 
 
