@@ -136,7 +136,7 @@ which(is.na(train_data$B365D))
 which(is.na(train_data$B365H))
 ```
 
-So only 9 more rows with missing values (none overlapping with the match statistics). For the Betting Model we will use the training data without these rows as well as the previous 3 rows we found:
+So only 9 more rows with missing values (none overlapping with the match statistics). For the Betting Model we will use the training data without these rows as well as the previous 3 rows we found had match statistics missing:
 
 ```{r}
 train_data_B<-train_data_NB[complete.cases(train_data_NB[, c("B365H", "B365D", "B365A")]),]
@@ -487,8 +487,178 @@ The class-specific statistics and the confusion matrices do reveal that the Bett
 
 Furthermore, the overall pattern was similar in both. In particular they were both extremely weak at classifying Draws correctly from the pool of data that were Draws - both floating around 10-11% Draw Recall. Their Precision when they did predict a Draw was also lower than corresponding Home/Away win Precision but not by as large a margin. In contrast, both model's best scoring metric relatively was the Home win Recall.
 
-While the differences in the OOF prediction metrics, as well as the difference in actual CV accuracy, are small, in combination the evidence points towards the best Betting SVM as our choice of model.
+While the differences in the OOF prediction metrics, as well as the difference in actual CV accuracy, are small, in combination the evidence points towards the best Betting SVM as our choice of model. We will move forward with analyzing its performance on the test data, after a short detour on imputation.
 
+
+**4. Imputation Test**
+
+In this section we will perform imputation on the training data. We already have our chosen model, therefore this section will just be a separate experiment, that unfortunately couldn't be utilised. The reason for this is that the missingness was just too high across the board to justify, and it would have also required imputation on the test set for the final evaluation if it was selected. 
+
+Recalling the table for missingness:
+
+```{r}
+missingness
+```
+
+We will choose to do imputation on a model including the 3 betting sites with less than 12% of their odds missing - Betway, William Hill and Interwetten. We will also impute the extra 12 (assuming no overlap) total missing cases we already had, in order to bring the number of observations back to level with the original training data.
+
+```{r}
+impute_vars <- c(
+  "BWA", "BWD", "BWH",
+  "WHA", "WHD", "WHH",
+  "IWH", "IWD", "IWA"
+)
+
+selected_predictors_imputed <- unique(c(
+  selected_predictors_B,
+  impute_vars
+))
+
+train_imp <- train_data[
+  , c("FTR", selected_predictors_imputed),
+  drop = FALSE
+]
+```
+
+Using `mice` package for multiple imputation:
+
+```{r}
+ini <- mice(
+  train_imp,
+  maxit = 0,
+  printFlag = FALSE
+)
+
+meth <- ini$method
+pred <- ini$predictorMatrix
+
+meth["FTR"] <- ""
+
+pred[, "FTR"] <- 0
+
+for (v in selected_predictors_imputed) {
+  if (anyNA(train_imp[[v]])) {
+    meth[v] <- "pmm"
+  } else {
+    meth[v] <- ""
+  }
+}
+
+imp <- mice(
+  train_imp,
+  method = meth,
+  predictorMatrix = pred,
+  m = 5,
+  maxit = 5,
+  seed = 123,
+  printFlag = FALSE
+)
+
+train_imp_filled1 <- complete(imp, 1)
+train_imp_filled2 <- complete(imp, 2)
+train_imp_filled3 <- complete(imp, 3)
+train_imp_filled4 <- complete(imp, 4)
+train_imp_filled5 <- complete(imp, 5)
+```
+
+Now fitting SVMs to their respective training data:
+
+```{r}
+# Converting results to factor variables
+train_imp_filled1$FTR <- factor(train_imp_filled1$FTR, levels = c("H", "D", "A"))
+train_imp_filled2$FTR <- factor(train_imp_filled2$FTR, levels = c("H", "D", "A"))
+train_imp_filled3$FTR <- factor(train_imp_filled3$FTR, levels = c("H", "D", "A"))
+train_imp_filled4$FTR <- factor(train_imp_filled4$FTR, levels = c("H", "D", "A"))
+train_imp_filled5$FTR <- factor(train_imp_filled5$FTR, levels = c("H", "D", "A"))
+
+imputed_svm1 <- svm(FTR ~ ., data = train_imp_filled1[, c("FTR", selected_predictors_imputed), drop = FALSE], kernel = "radial", cost = 1, gamma = 1 / length(selected_predictors_imputed), scale = TRUE)
+imputed_svm2 <- svm(FTR ~ ., data = train_imp_filled2[, c("FTR", selected_predictors_imputed), drop = FALSE], kernel = "radial", cost = 1, gamma = 1 / length(selected_predictors_imputed), scale = TRUE)
+imputed_svm3 <- svm(FTR ~ ., data = train_imp_filled3[, c("FTR", selected_predictors_imputed), drop = FALSE], kernel = "radial", cost = 1, gamma = 1 / length(selected_predictors_imputed), scale = TRUE)
+imputed_svm4 <- svm(FTR ~ ., data = train_imp_filled4[, c("FTR", selected_predictors_imputed), drop = FALSE], kernel = "radial", cost = 1, gamma = 1 / length(selected_predictors_imputed), scale = TRUE)
+imputed_svm5 <- svm(FTR ~ ., data = train_imp_filled5[, c("FTR", selected_predictors_imputed), drop = FALSE], kernel = "radial", cost = 1, gamma = 1 / length(selected_predictors_imputed), scale = TRUE)
+```
+
+and making predictions using their respective training data (for the same reason as the baseline models, their performances may be slightly optimistic due to this):
+
+```{r}
+imputed_svm_predictions1 <- predict(imputed_svm1, newdata = train_imp_filled1)
+imputed_svm_predictions2 <- predict(imputed_svm2, newdata = train_imp_filled2)
+imputed_svm_predictions3 <- predict(imputed_svm3, newdata = train_imp_filled3)
+imputed_svm_predictions4 <- predict(imputed_svm4, newdata = train_imp_filled4)
+imputed_svm_predictions5 <- predict(imputed_svm5, newdata = train_imp_filled5)
+```
+
+Now we can get an idea of how the metrics vary across the multiple imputation:
+
+```{r}
+imputed_metrics1 <- calculate_metrics(actual = train_imp_filled1$FTR, predicted = imputed_svm_predictions1)
+imputed_metrics2 <- calculate_metrics(actual = train_imp_filled2$FTR, predicted = imputed_svm_predictions2)
+imputed_metrics3 <- calculate_metrics(actual = train_imp_filled3$FTR, predicted = imputed_svm_predictions3)
+imputed_metrics4 <- calculate_metrics(actual = train_imp_filled4$FTR, predicted = imputed_svm_predictions4)
+imputed_metrics5 <- calculate_metrics(actual = train_imp_filled5$FTR, predicted = imputed_svm_predictions5)
+```
+
+putting into a table:
+
+```{r}
+imputation_comparison <- data.frame(
+  Imputation = paste("Imputation", 1:5),
+  Accuracy = c(imputed_metrics1$overall$Accuracy,imputed_metrics2$overall$Accuracy,imputed_metrics3$overall$Accuracy,
+               imputed_metrics4$overall$Accuracy,imputed_metrics5$overall$Accuracy),
+  Kappa = c(imputed_metrics1$overall$Kappa, imputed_metrics2$overall$Kappa, imputed_metrics3$overall$Kappa,
+            imputed_metrics4$overall$Kappa, imputed_metrics5$overall$Kappa),
+  Macro_Precision = c(imputed_metrics1$overall$Macro_Precision, imputed_metrics2$overall$Macro_Precision,
+                      imputed_metrics3$overall$Macro_Precision, imputed_metrics4$overall$Macro_Precision,
+                      imputed_metrics5$overall$Macro_Precision),
+  Macro_Recall = c(imputed_metrics1$overall$Macro_Recall, imputed_metrics2$overall$Macro_Recall,
+                   imputed_metrics3$overall$Macro_Recall, imputed_metrics4$overall$Macro_Recall,
+                   imputed_metrics5$overall$Macro_Recall),
+  Macro_F1 = c(imputed_metrics1$overall$Macro_F1, imputed_metrics2$overall$Macro_F1,
+               imputed_metrics3$overall$Macro_F1, imputed_metrics4$overall$Macro_F1,
+               imputed_metrics5$overall$Macro_F1)
+)
+
+imputation_comparison
+```
+
+From this we can see that there is very little variance between the metrics gotten from each imputation.
+We can formalize this:
+
+```{r}
+imputation_summary <- data.frame(
+  Metric = c("Accuracy", "Kappa", "Macro Precision",
+             "Macro Recall", "Macro F1"),
+  Mean = sapply(imputation_comparison[, -1], mean, na.rm = TRUE),
+  SD = sapply(imputation_comparison[, -1], sd, na.rm = TRUE)
+)
+
+imputation_summary
+```
+
+Each metric has an extremely low standard deviation across imputations. This indicates that the metrics were consistent through each imputation for the training data.
+
+Furthermore the metrics were higher across the board than the Out-Of-Fold ones obtained by the best SVMs during cross validation. However as stated previously, this was expected since these metrics were calculated using predictions of the same datasets that the imputed models were trained on. In fact, the baseline models actually also performed better on their own training data. Therefore we cannot use this as evidence of better performance without doing Cross Validation on the imputed models.
+
+Although the imputed datasets were not in consideration for building our final model, the patterns shown by these results are similar to what has been seen before. Hence this acts as useful information about how an SVM may perform if an imputation was required.
+
+
+**5. Evaluating the best Betting SVM on the test data**
+
+Now we can move onto evaluating the performance of our chosen 'best' SVM from Section 3 on the test data. Firstly there is something we must have in order to later plot the ROC curves - the probabilities. Luckily as we already have the 
+
+let's just check that there are no missing values of the models selected predictors in the test data:
+
+```{r}
+sum(colSums(is.na(test_data[, selected_predictors_B, drop = FALSE])) == 0)
+```
+
+So there are no missing values for all 15 selected predictors, and we can move onto predicting the results using `best_svm_B`:
+
+```{r}
+test_predictions<-predict(best_svm_B, newdata=test_data[, selected_predictors_B, drop=FALSE], probability=TRUE)
+```
+
+Here we included the computation and storing of the probabilities as we will need them later for the ROC curves. 
 
 
 ```{r}
