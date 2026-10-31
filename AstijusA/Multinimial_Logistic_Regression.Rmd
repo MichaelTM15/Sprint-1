@@ -1,0 +1,607 @@
+---
+title: "Multinomial Logistic Regression: Lower-League Training to Premier League Test"
+subtitle: "Group project - multinomial regression section"
+output:
+  pdf_document:
+    toc: true
+    toc_depth: '3'
+  html_document:
+    toc: true
+    toc_depth: 3
+    number_sections: false
+---
+
+```{r setup, include=FALSE}
+# Keep the report readable, but do not hide warnings from model fitting.
+knitr::opts_chunk$set(
+  echo = TRUE,
+  message = FALSE,
+  warning = TRUE,
+  fig.align = "center",
+  fig.width = 8,
+  fig.height = 5
+)
+
+library(nnet)  # multinomial logistic regression
+library(MASS)  # AIC-based stepwise selection
+library(pROC)  # ROC curves and AUC
+library(knitr) # clean tables in the report
+library(corrplot)
+library(ggplot2)
+
+set.seed(42)  # make the cross-validation splits reproducible
+```
+
+# 1. Introduction and data cleaning
+
+Can a model trained on lower-league football classify Premier League results? We use match statistics, excluding goals and the half-time result.
+
+Multinoimial regression contributes three things other methods cannot:
+
+1.  Directly interpretable coefficients. Each coefficient is a log-odds ratio for one outcome relative to a baseline.
+
+2.  It directly estimates probabilities for Home, Draw and Away.
+
+3.  It provides a benchmark for assessing whether more complex methods improve performance e.g. if random forests or SVMs perform similarly, their added complexity may offer little benefit.
+
+## 1.2 Load the data and define the outcome
+
+```{r load-data}
+
+train_raw <- read.csv("~/GitHub/Sprint-1/processed-data/football_train_data.csv", stringsAsFactors = FALSE)
+
+test_raw <- read.csv("~/GitHub/Sprint-1/processed-data/football_test_data.csv", stringsAsFactors = FALSE)
+
+# Match statistics used in the main analysis.
+stats_all <- c(
+  "HS", "AS", "HST", "AST", "HF", "AF",
+  "HC", "AC", "HY", "AY", "HR", "AR"
+)
+
+# Bookmaker odds
+# H = home win, D = draw, A = away win.
+odds_cols <- c("B365H", "B365D", "B365A")
+
+outcome_levels <- c("D", "A", "H")
+```
+
+## 1.3 Clean the rows and create simple features
+
+We remove rows with missing outcomes or missing values in the 12 match statistics. This keeps model comparisons on the same matches. It may introduce bias if missingness is related to the match or league.
+
+I also create **differences** (home minus away) and **totals** (home plus away). The difference describes which side has the advantage and the total describes overall magnitude during the match.
+
+```{r clean-data}
+
+prepare_matches <- function(data, predictors) {
+  
+  # Keep the original row number so predictions can be matched across models.
+  data$source_row <- seq_len(nrow(data))
+
+  # Use the same complete cases for all models in this experiment.
+  keep <- complete.cases(data[, c("FTR", predictors), drop = FALSE])
+  data <- data[keep, , drop = FALSE]
+
+  # Remove results that are not H, D or A and set a fixed class order.
+  data$FTR <- factor(data$FTR, levels = outcome_levels)
+  data <- data[!is.na(data$FTR), , drop = FALSE]
+
+  # Differences: positive means the home team had the larger count.
+  data$d_sot <- data$HST - data$AST
+  data$d_shots <- data$HS - data$AS
+  data$d_corners <- data$HC - data$AC
+
+  # Totals: a rough measure of overall match activity.
+  data$t_sot <- data$HST + data$AST
+  data$t_shots <- data$HS + data$AS
+  data$t_corners <- data$HC + data$AC
+
+  data
+}
+
+# Main data: same 12-statistic complete-case rule for train and test.
+train_main <- prepare_matches(train_raw, stats_all)
+test_main <- prepare_matches(test_raw, stats_all)
+
+# A class must be present for multinomial fitting 
+if (any(table(train_main$FTR) == 0) || any(table(test_main$FTR) == 0)) {
+  stop("Each outcome (D, A and H) must occur in both cleaned datasets.")
+}
+
+cat("Training rows in original file:", nrow(train_raw), "\n")
+cat("Training rows used:", nrow(train_main), "\n")
+cat("Premier League test rows in original file:", nrow(test_raw), "\n")
+cat("Premier League test rows used:", nrow(test_main), "\n")
+```
+
+# 2. Initial EDA
+
+## 2.1 Compare the outcome balance
+
+Home wins are the most common outcome in both the training and test data sets, with slightly more home wins in the Premier League sample. If we always predict a Home win this achieves $45.49\%$ test accuracy, providing a more meaningful baseline than $1/3\%$ accuracy.
+
+```{r class-balance}
+class_share <- rbind(
+  `Lower-league training` = prop.table(table(factor(train_main$FTR, levels = outcome_levels))),
+  `Premier League test` = prop.table(table(factor(test_main$FTR, levels = outcome_levels)))
+)
+
+colnames(class_share) <- c("Draw", "Away win", "Home win")
+
+barplot(
+  t(class_share), beside = TRUE,
+  names.arg = rownames(class_share),
+  legend.text = colnames(class_share),
+  ylab = "Proportion of matches",
+  main = "Outcome balance in training and test data",
+  ylim = c(0, 1), las = 1
+)
+```
+
+```{r predictor-correlation, fig.height=7}
+set.seed(4)
+idx <- sample(seq_len(nrow(train_main)), min(1500, nrow(train_main)))
+pairs(train_main[idx, c("HS", "AS", "HST", "AST", "HC", "AC")],
+      pch = 16, cex = 0.35, main = "Relationships between attacking statistics (sample)")
+round(cor(train_main[, stats_all]), 2)
+```
+
+## 2.2 Check for redundant predictors
+
+Shots and shots on target are moderately correlated for both home and away teams $(r=0.62, r=0.63)$. This suggests overlapping information and motivates comparing the full model with smaller alternatives
+
+```{r correlations}
+library(corrplot)
+
+correlation_matrix <- cor(train_main[, stats_all])
+corrplot(correlation_matrix, method = "color", addCoef.col = "black")
+```
+
+## 2.3 Look at the relationship between shot advantage and result
+
+This plot groups matches by the difference between home and away shots on target. It shows whether home wins become more common as the home side's advantage increases.
+
+```{r shot-advantage}
+# Use quantiles to make groups of roughly similar size.
+cut_points <- unique(quantile(
+  train_main$d_sot,
+  probs = seq(0, 1, by = 0.1),
+
+))
+
+
+shot_group <- cut(train_main$d_sot, breaks = cut_points, include.lowest = TRUE)
+shot_group <- droplevels(shot_group)
+
+result_by_shot_group <- prop.table(
+  table(shot_group, factor(train_main$FTR, levels = outcome_levels)),
+  margin = 1
+)
+
+barplot(
+  t(result_by_shot_group), beside = TRUE,
+  names.arg = rownames(result_by_shot_group),
+   legend.text = c("Draw", "Away win", "Home win"),
+   ylab = "Observed proportion",
+   main = "Observed result by home-minus-away shots on target",
+   las = 2, cex.names = 0.7, ylim = c(0, 1)
+)
+```
+
+We look at outcome proportions across shots on target differences to investigate how a relative attacking advantage relates to results. This motivates a difference based predictor and a sensitivity analysis excluding shots on target to see if we gain information by including it.
+
+# 3. Model selection
+
+## 3.1 What multinomial logistic regression estimates
+
+The response has three unordered classes: draw, away win and home win. Multinomial logistic regression estimates a probability for each class, with the probabilities adding to one:
+
+$$
+P(Y_i = k \mid \mathbf{x}_i) =
+\frac{\exp(\alpha_k + \mathbf{x}_i^\top\boldsymbol{\beta}_k)}
+{\sum_{j \in \{D,A,H\}} \exp(\alpha_j + \mathbf{x}_i^\top\boldsymbol{\beta}_j)}.
+$$
+
+This model estimates probabilities for Home, Draw and Away. With Draw as the reference, coefficients describe changes in home versus draw and away versus draw log-odds.
+
+## 3.2 Models to compare
+
+Each model addresses a specific question, whether shots on target dominate performance, whether other statistics add information, and whether an interaction improves fit. Backward selection tests whether a smaller raw-statistics model is sufficient.
+
+1.  **Null baseline:**
+2.  **Full statistics:** includes all 12 statistics.
+3.  **Shots and corners:** a smaller model focused on attacking output.
+4.  **Differences and totals:**
+5.  **Difference-total interaction:**
+6.  **Without shots on target:** checks whether the result depends heavily on the statistic most directly linked to scoring.
+7.  **Backward AIC:** starts with the full statistics model and removes terms when it improves AIC.
+
+Why I've chosen to investigate the interaction term ? A difference of two shots on target could mean 4 versus 2 or 12 versus 10. The difference is the same, but the overall match output is not. The interaction tests whether the relationship between the difference and outcome changes with the total and if it can accurately classify our matches.
+
+```{r model-formulas}
+
+# Models I'd like to try.
+formulas_main <- list(
+  "Null baseline" = FTR ~ 1,
+  
+  "Only SoT" = FTR ~ HST + AST,
+
+  "Full statistics" = FTR ~ HS + AS + HST + AST + HF + AF +
+    HC + AC + HY + AY + HR + AR,
+
+  "Shots and corners" = FTR ~ HST + AST + HS + AS + HC + AC,
+
+  "Differences and totals" = FTR ~ d_sot + t_sot +
+    d_shots + t_shots + d_corners + t_corners,
+
+  "Difference-total interaction" = FTR ~ d_sot * t_sot +
+    d_shots + t_shots + d_corners + t_corners,
+
+  "Without shots on target" = FTR ~ HS + AS + HF + AF +
+    HC + AC + HY + AY + HR + AR
+)
+
+# Model names
+main_model_names <- c(names(formulas_main), "Backward AIC")
+
+# Create empty list to store fitted models
+main_fits <- list()
+
+# Fit each model
+for (model_name in main_model_names) {
+
+  if (model_name == "Backward AIC") {
+
+    full_fit <- multinom(
+      FTR ~ HS + AS + HST + AST + HF + AF +
+        HC + AC + HY + AY + HR + AR,
+      data = train_main,
+      maxit = 500,
+      trace = FALSE
+    )
+
+    main_fits[[model_name]] <- stepAIC(
+      full_fit,
+      direction = "backward",
+      trace = FALSE
+    )
+
+  } else {
+
+    main_fits[[model_name]] <- multinom(
+      formulas_main[[model_name]],
+      data = train_main,
+      maxit = 500,
+      trace = FALSE
+    )
+  }
+}
+main_fits
+```
+
+## 3.3 ANOVA to test whether the statistics add information
+
+First compare the SoT only model with the full model using a likelihood-ratio test. This tests whether the 12 predictors, considered together, improve fit over an SoT model.
+
+```{r anova-null-full}
+anova(
+  main_fits[["Only SoT"]],
+  main_fits[["Full statistics"]],
+  test = "Chisq"
+)
+```
+
+Adding the remaining statistics to the shots on target model reduced deviance by $2549.75$. This supports using the additional parameters for our end model and that classification is not singularly dominated by the home and away shots on target statistics.
+
+## 3.4 Compare models with AIC
+
+AIC balances model fit against model complexity. AIC is a useful selection tool, but cannot be relied upon fully to select the 'optimal model'
+
+```{r aic-comparison}
+# Compare AIC
+main_aic <- data.frame(
+  Model = main_model_names,
+  AIC = NA_real_
+)
+
+for (i in seq_along(main_model_names)) {
+  main_aic$AIC[i] <- AIC(main_fits[[main_model_names[i]]])
+}
+
+# Sort by lowest AIC
+main_aic <- main_aic[order(main_aic$AIC), ]
+main_aic
+```
+
+The interaction model achieved the lowest AIC: $71848.37$. Backward selection removed yellow cards as a parameter but only slightly improved AIC over the full model.
+
+# 4. Bookmaker odds
+
+The three models below use only matches with complete values for all 12 match statistics and all three Bet365 odds columns.
+
+```{r prepare-odds-data}
+train_odds <- prepare_matches(train_raw, c(stats_all, odds_cols))
+test_odds <- prepare_matches(test_raw, c(stats_all, odds_cols))
+
+cat("Training rows in odds comparison:", nrow(train_odds), "\n")
+cat("Test rows in odds comparison:", nrow(test_odds), "\n")
+```
+
+Missing odds excluded nine additional training matches (approximately $0.024%$) and no test matches. Although the training samples are almost identical, cross sample AIC comparisons are treated cautiously because the effect of these exclusions has not been looked into.
+
+```{r odds-models}
+# Models including bookmaker odds
+formulas_odds <- list(
+
+  "Bookmaker odds only" = FTR ~ B365H + B365D + B365A,
+
+  "Statistics plus odds" = FTR ~ HS + AS + HST + AST + HF + AF +
+    HC + AC + HY + AY + HR + AR + B365H + B365D + B365A,
+  
+  "Difference intercation plus odds" = FTR ~ d_sot * t_sot + d_shots +
+    t_shots + d_corners + t_corners + B365H + B365D + B365A
+)
+# Model names
+odds_model_names <- names(formulas_odds)
+
+# Empty list to store models
+odds_fits <- list()
+
+# Fit each model
+for (model_name in odds_model_names) {
+  
+  odds_fits[[model_name]] <- multinom(
+    formulas_odds[[model_name]],
+    data = train_odds,
+    maxit = 500,
+    trace = FALSE
+  )
+}
+
+# Compare AIC
+odds_aic <- data.frame(
+  Model = odds_model_names,
+  AIC = NA_real_
+)
+
+for (i in seq_along(odds_model_names)) {
+  odds_aic$AIC[i] <- AIC(odds_fits[[odds_model_names[i]]])
+}
+
+# Sort by lowest AIC
+odds_aic <- odds_aic[order(odds_aic$AIC), ]
+odds_aic
+```
+
+# 5. Choosing a model
+
+## 5.1 Select the final model
+
+Our models are compared using AIC. The model with the lowest AIC is selected for further evaluation.
+
+The Premier League test data is not used to select the model yet.
+
+```{r model-selection}
+total_aic <- rbind(main_aic, odds_aic)
+total_aic <- total_aic[order(total_aic$AIC), ]
+total_aic
+
+selected_model <- total_aic$Model[1]
+selected_fit <- total_aic$AIC[1]
+
+cat("Selected model:", selected_model, "\n")
+cat("Selected model AIC:", selected_fit, "\n")
+```
+
+The model with interaction terms was preferred by AIC within both training sets, one with odds one without.
+
+## 5.2 Define performance metrics
+
+```{r scoring-function}
+score_predictions <- function(model, test_data) {
+  # Predict probabilities
+  probabilities <- predict(model, newdata = test_data, type = "probs")
+
+  # Predict the outcome with the highest probability
+  predicted <- colnames(probabilities)[max.col(probabilities)]
+  
+  # Percentage correct
+  correct_percent <- mean(predicted == test_data$FTR) * 100
+
+  # Calculate ROC curves and AUC for each outcome
+  roc_results <- list()
+  auc_results <- numeric()
+
+  for (outcome in colnames(probabilities)) {
+
+    roc_results[[outcome]] <- roc(
+      test_data$FTR == outcome,
+      probabilities[, outcome],
+      quiet = TRUE
+    )
+
+    auc_results[outcome] <- as.numeric(
+      auc(roc_results[[outcome]])
+    )
+  }
+
+  # Return results
+  list(
+    CorrectPercent = correct_percent,
+    AUC = auc_results,
+    ROC = roc_results
+  )
+}
+```
+
+# 6. Premier League test
+
+## 6.1 Compare every main model
+
+Every fitted model is evaluated on the same Premier League test rows.
+
+```{r accuracty metrics}
+all_fits <- c(main_fits, odds_fits)
+
+all_results <- list()
+
+for (model_name in names(all_fits)) {
+
+  if (model_name %in% names(odds_fits)) {
+    all_results[[model_name]] <- score_predictions(
+      all_fits[[model_name]],
+      test_odds
+    )
+  } else {
+    all_results[[model_name]] <- score_predictions(
+      all_fits[[model_name]],
+      test_main
+    )
+  }
+}
+
+# Create empty results table
+results_table <- data.frame(
+  Model = character(),
+  AIC = numeric(),
+  CorrectPercent = numeric(),
+  AUC_Home = numeric(),
+  AUC_Draw = numeric(),
+  AUC_Away = numeric()
+)
+
+# Fill results table
+for (model_name in names(all_fits)) {
+
+  results_table[nrow(results_table) + 1, ] <- list(
+    model_name,
+    AIC(all_fits[[model_name]]),
+    all_results[[model_name]]$CorrectPercent,
+    all_results[[model_name]]$AUC["H"],
+    all_results[[model_name]]$AUC["D"],
+    all_results[[model_name]]$AUC["A"]
+  )
+}
+# Round numerical results
+results_table[, -1] <- round(results_table[, -1], 3)
+results_table
+```
+
+The full model achieved 57.12% accuracy, compared with 55.98% using shots on target alone and 51.40% without them. Shots on target are therefore important, but do not capture all available information.
+
+Adding bookmaker odds increased the full model’s accuracy to 60.13%, slightly exceeding the diffrenced interaction with odds model’s 59.79%. Although AIC favoured the interaction model, the full statistics plus odds model achieved the highest test accuracy. This highlights that a better penalised training fit does not necessarily manifest into better classification performance.
+
+## 6.3 ROC curves
+
+```{r ROC}
+# Sort models by percentage correct
+results_table <- results_table[order(results_table$CorrectPercent, decreasing = TRUE), ]
+
+# Select top 3
+top_3 <- head(results_table$Model, 3)
+
+# Set up colours for each model
+model_colours <- c("blue", "red", "darkgreen")
+
+# Plot ROC curves for home wins
+plot(
+  all_results[[top_3[1]]]$ROC[["H"]],
+  col = model_colours[1],
+  main = "ROC Curves - Home Wins"
+)
+
+for (i in 2:3) {
+  plot(
+    all_results[[top_3[i]]]$ROC[["H"]],
+    col = model_colours[i],
+    add = TRUE
+  )
+}
+
+legend("bottomright", legend = top_3, col = model_colours, lty = 1)
+
+
+# Plot ROC curves for draws
+plot(
+  all_results[[top_3[1]]]$ROC[["D"]],
+  col = model_colours[1],
+  main = "ROC Curves - Draws"
+)
+
+for (i in 2:3) {
+  plot(
+    all_results[[top_3[i]]]$ROC[["D"]],
+    col = model_colours[i],
+    add = TRUE
+  )
+}
+
+legend("bottomright", legend = top_3, col = model_colours, lty = 1)
+
+
+# Plot ROC curves for away wins
+plot(
+  all_results[[top_3[1]]]$ROC[["A"]],
+  col = model_colours[1],
+  main = "ROC Curves - Away Wins"
+)
+
+for (i in 2:3) {
+  plot(
+    all_results[[top_3[i]]]$ROC[["A"]],
+    col = model_colours[i],
+    add = TRUE
+  )
+}
+
+legend("bottomright", legend = top_3, col = model_colours, lty = 1)
+
+```
+
+The two odds-enhanced models have almost identical ROC performance, with AUCs around 0.8 for home wins, 0.815 for away wins and 0.63 for draws. Both outperform the full statistics-only model across all three outcomes.
+
+Draws remain the hardest outcome to classify, even after introducing odds. One possible reason is that two teams can record similar shots and shots on target, yet one still wins narrowly. This overlap makes it harder for the model to identify a clear pattern separating draws from wins.
+
+## 6.4 Confusion matrix
+
+```{r}
+fit <- odds_fits[["Difference intercation plus odds"]]
+
+predicted <- predict(fit, newdata = test_odds, type = "class")
+
+cm <- table(
+  Actual = test_odds$FTR,
+  Predicted = factor(predicted, levels = outcome_levels)
+)
+
+ggplot(as.data.frame(cm), aes(Predicted, Actual, fill = Freq)) +
+  geom_tile(colour = "white") +
+  geom_text(aes(label = Freq), size = 5) +
+  scale_fill_gradient(low = "white", high = "steelblue") +
+  coord_equal() +
+  labs(title = "Confusion matrix", fill = "Matches") +
+  theme_minimal()
+```
+
+The confusion matrix displays a clear weakness in identifying draws, only $136$ of $2159$ actual draws were correctly classified ($6.3\%$), with most predicted as home wins. Alternatively, the model correctly identified $82.6\%$ of home wins and $69.4\%$ of away wins. We have a strong win classification but a very poor draw classification with this model.
+
+# 7. Conclusion & Limitations 
+
+## 7.1 Conclusion
+
+The full statistics plus odds model achieved the highest accuracy of 60.13%, compared with 45.49% for the majority class baseline. Note, the difference interaction plus odds model was preferred by AIC within the odds-based comparison, showing how a better penalised training fit does not always produce higher test accuracy.
+
+The feature sensitivity analysis helped identify where the information came from. Using backwards AIC for the full model we identified, away yellow cards as the least important predictor. Removing shots on target reduced accuracy from 57.12% to 51.40%, while the shots on target only model achieved 55.98%. Therefore SoT account for much but not all of the information/model’s performance. Adding bookmaker odds provided further gains.
+
+Our most important finding was a strong weakness of the model in predicting draws. The difference intercation plus odds model correctly identified only 6.3% of actual draws, compared with 82.6% of home wins and 69.4% of away wins.
+
+The confusion matrix changed our interpretation of our overall performance. The model was reasonably effective at identifying wins, but was not a balanced three outcome classifier, especially for draws.
+
+## 7.2 Limits of the data set
+
+The available data limits how accurately we can distinguish draws from narrow victories. Similar numbers of shots, shots on target and corners can classify either result, leaving no clear statistical separation. Adding more parameters cannot fully compensate for missing information.
+
+## References
+
+-   University of Bristol, Data Science Toolbox <https://dsbristol.github.io/dst/coursebook.html>
+-   University of Bristol, Linear and Generalised Linear Models (MATH30013) lecture notes
