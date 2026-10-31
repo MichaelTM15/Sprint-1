@@ -21,6 +21,7 @@ library(mice)
 library(pROC)
 library(ggplot2)
 library(patchwork)
+library(gplots)
 ```
 
 **1. Data Pre-Processing and Missingness Analysis**
@@ -637,28 +638,136 @@ imputation_summary
 
 Each metric has an extremely low standard deviation across imputations. This indicates that the metrics were consistent through each imputation for the training data.
 
-Furthermore the metrics were higher across the board than the Out-Of-Fold ones obtained by the best SVMs during cross validation. However as stated previously, this was expected since these metrics were calculated using predictions of the same datasets that the imputed models were trained on. In fact, the baseline models actually also performed better on their own training data. Therefore we cannot use this as evidence of better performance without doing Cross Validation on the imputed models.
+Furthermore the metrics were higher across the board than the Out-Of-Fold ones obtained by the best SVMs during cross validation. However as stated previously, this was expected since these metrics were calculated using predictions of the same datasets that the imputed models were trained on. In fact, the baseline models actually also performed better on their own training data. Therefore we cannot use this as evidence of better performance without doing Cross Validation on the imputed models. 
+
+Comparing the training performances of the baseline models and the imputed models, it suggests that adding betting odds as a predictor improves predictive performance, but does not keep stacking with more and more sites, i.e. there isn't any extra predictive power to be gleaned from multiple different sites in this experiment. Again though as this is only based on training performance and the betting odds can potentially interact in different ways with the match statistics and each other, no definitive conclusions should be made.
 
 Although the imputed datasets were not in consideration for building our final model, the patterns shown by these results are similar to what has been seen before. Hence this acts as useful information about how an SVM may perform if an imputation was required.
 
 
 **5. Evaluating the best Betting SVM on the test data**
 
-Now we can move onto evaluating the performance of our chosen 'best' SVM from Section 3 on the test data. Firstly there is something we must have in order to later plot the ROC curves - the probabilities. Luckily as we already have the 
+Now we can move onto evaluating the performance of our chosen 'best' SVM from Section 3 on the test data. Firstly there is something we must have in order to later plot the ROC curves - the prediction probabilities. Luckily as we already have the best parameters, we can just refit the same model, but retaining the probability estimates this time.
 
-let's just check that there are no missing values of the models selected predictors in the test data:
+```{r}
+best_svm_B_prob <- svm(FTR ~ ., data = train_data_B[, c("FTR", selected_predictors_B), drop = FALSE], 
+                       kernel = "radial", cost = best_parameters_B$cost, gamma = best_parameters_B$gamma, 
+                       scale = TRUE, probability = TRUE)
+```
+
+We will use this throughout the rest of the section. Now let's just check that there are no missing values of the model's selected predictors in the test data:
 
 ```{r}
 sum(colSums(is.na(test_data[, selected_predictors_B, drop = FALSE])) == 0)
 ```
 
-So there are no missing values for all 15 selected predictors, and we can move onto predicting the results using `best_svm_B`:
+So there are no missing values for all 15 selected predictors, and we can move onto predicting the results using `best_svm_B_prob`:
 
 ```{r}
-test_predictions<-predict(best_svm_B, newdata=test_data[, selected_predictors_B, drop=FALSE], probability=TRUE)
+test_predictions<-predict(best_svm_B_prob, newdata=test_data[, selected_predictors_B, drop=FALSE], probability=TRUE)
 ```
 
-Here we included the computation and storing of the probabilities as we will need them later for the ROC curves. 
+then getting its performance metrics:
+
+```{r}
+test_metrics<-calculate_metrics(actual=test_data$FTR, predicted = test_predictions)
+```
+
+which are sorted by:
+
+Overall
+
+```{r}
+test_metrics$overall
+```
+
+Class-specific statistics
+
+```{r}
+test_metrics$by_class
+```
+
+Confusion matrix
+
+```{r}
+test_metrics$confusion_matrix
+```
+
+These metrics reveal the overall classification performance of the best model. Clearly the SVM had a strong problem with identifying a draw, though its accuracy for away and especially home wins was relatively good. This is a consistent pattern with the baseline models' performance on the training data and this particular SVM's OOF performance. 
+
+Interestingly, the accuracy (and actually all of the other metrics) reported on the test set ended up being higher than on the Out-Of-Fold Validation data. They were also even higher than the respective metrics of the models that were predicting results on their own training data.
+
+Earlier analysis of the data had revealed that the lower leagues had a smaller proportion of home wins and a higher proportion of draws in comparison with the Premier League. Thus it is possible that this fact contributed to the increase in overall accuracy, along with the other metrics. This is useful to consider when thinking about if the data from the lower leagues lends itself to training models for use on the Premier League.
+
+As another assessment of the model's classification performance, we can plot ROC curves for each of the outcomes:
+
+```{r}
+prob_B <- attr(test_predictions, "probabilities")
+actual <- factor(test_data$FTR, levels = c("H", "D", "A"))
+
+roc_H <- roc(actual == "H", prob_B[, "H"], quiet = TRUE)
+roc_D <- roc(actual == "D", prob_B[, "D"], quiet = TRUE)
+roc_A <- roc(actual == "A", prob_B[, "A"], quiet = TRUE)
+macro_auc<-mean(c(auc(roc_H), auc(roc_D), auc(roc_A)))
+
+plot(roc_H, col = "blue",
+     xlim = c(1.0, 0.0),
+     main = "ROC Curves - Best SVM with Betting Odds")
+plot(roc_D, col = "green", add = TRUE)
+plot(roc_A, col = "red", add = TRUE)
+
+abline(a = 0, b = 1, lty = 2, col = "grey")
+
+legend(
+  "bottomright",
+  legend = c(
+    paste("Home win AUC:", round(auc(roc_H), 3)),
+    paste("Draw AUC:", round(auc(roc_D), 3)),
+    paste("Away win AUC:", round(auc(roc_A), 3)),
+    paste("Macro-average AUC:", round(macro_auc, 3))
+  ),
+  col = c("blue", "green", "red", "white"),
+  lty = 1,
+  cex = 0.8
+)
+```
+
+Here the Macro-average AUC is a combined metric of each of the 3 calculated AUCs, just by taking the (unweighted) mean. Another, different, overall measurement that serves the same purpose is the multi-class AUC:
+
+```{r}
+multiclass_auc <- pROC::multiclass.roc(response = actual, predictor = prob_B)
+print(multiclass_auc)
+```
+
+Either can be used but they take different assumptions - the macro AUC gives each outcome the same importance weighting, while the multi-class AUC adjusts for the proportions of the outcomes in the data.
+
+From the ROC curves, we can see that while obviously the Draw outcome had the lowest AUC, the highest AUC was actually for Away wins. This differs from the hierarchy established by the class-specific Recall, Precision and F1 scores - where the Home win was king. This suggests that the Home win probabilities calculated by the SVM don't cause it to decide on this classification throughout all probability thresholds as often as the Away win probabilities do for that classification.
+
+
+We would like to further investigate the importance of the selected predictors. Before that, we will first create a heatmap to see what relationships they have with each other:
+
+```{r}
+predictor_correlations <- cor(train_data_B[, selected_predictors_B, drop=FALSE], use = "pairwise.complete.obs")
+
+heatmap_colours <- colorRampPalette(
+  c("blue", "white", "red")
+)(100)
+
+heatmap.2(
+  predictor_correlations,
+  symm = TRUE,
+  trace = "none",
+  col = heatmap_colours,
+  breaks = seq(-1, 1, length.out = 101),
+  key = TRUE,
+  main = "           Correlation Between Selected Predictors"
+)
+```
+
+Unsurprisingly the pairs of predictors with the highest positive correlation were between Shots/Shots on Target, Fouls/Yellows, Fouls/Reds for both Home and Away. The largest negative correlation was between the Bet365 Home/Away opening odds. Interestingly, the Draw odds had strong positive correlation with the Away win odds, but quite weak negative correlation with those for Home wins. 
+
+Next let's focus in on the 
+
 
 
 ```{r}
