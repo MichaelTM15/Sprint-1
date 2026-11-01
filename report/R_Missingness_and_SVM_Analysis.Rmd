@@ -14,7 +14,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 In this file we will investigate missingness in the data sets that were exported after the EDA, and fit a chosen Support Vector Machine model to the data with selected predictors. 
 
-SVMs offer  many advantages over other classification methods - the main one being that they use the decision boundary with the maximum margin between classes. This in theory makes them stronger than other decision boundary based classifiers like logistic regression. They also don't need this decision boundary to be linear. Furthermore SVMs generally perform well on a high-dimensional data without much memory usage needed for predictions once fitted.
+SVMs offer  many advantages over other classification methods - the main one being that they use the decision boundary with the maximum margin between classes. This can often make help them perform better than other decision boundary based classifiers like logistic regression. They also don't need this decision boundary to be linear. Furthermore SVMs generally perform well on high-dimensional data without much memory usage needed for predictions once fitted.
 
 Packages to load in order to run the file:
 
@@ -114,7 +114,7 @@ Next we will further examine missingness in order to get a training dataset that
 
 ```{r}
 # We've already checked for the (non-betting) match statistics
-odds_var<-setdiff(names(train_data), selected_predictors_NB)
+odds_var<-setdiff(predictors, selected_predictors_NB)
 
 missingness <- data.frame(
   Variable = odds_var,
@@ -263,13 +263,13 @@ baseline_training_metrics_B$by_class
 baseline_training_metrics_B$confusion_matrix
 ```
 
-Note for reference that Precision for a given class measures the proportion of predictions of that class the SVM made that were actually correct. Meanwhile Recall measures the proportion of the correct predictions of a class out of all the datapoints actually with that class, and F1 (score) is a combined metric of Precision and Recall for each class.
+Note for reference that Precision for a given class measures the proportion of predictions of that class the SVM made that were actually correct. Meanwhile Recall measures the proportion of datapoints with a class that the SVM made correct predictions for, and F1 (score) is a combined metric of Precision and Recall for each class.
 
 'Kappa' is Cohen's Kappa - an overall metric with formula
 $$
 \kappa = \frac{p_o-p_e}{1-p_e}
 $$
-where $p_o$ is the observed agreement - the proportion of datapoints for which the model predicted the same class that the data point is (i.e the accuracy in this case), and $p_e$ is the expected chance agreement - the probability that the model would predict the same class that the data point is by chance (calculated by using the individual proportions of each class in the dataset).
+where $p_o$ is the observed agreement - the proportion of datapoints for which the model predicted the same class that the data point is (i.e the accuracy in this case), and $p_e$ is the expected agreement by chance - the probability that the model would predict the same class that the data point is by chance (calculated by using the individual proportions of each class for the actual and predicted outcomes).
 
 From the American National Institutes of Health, a suggestive scale to interpret this was proposed by Cohen:
 "Cohen suggested the Kappa result be interpreted as follows: values ≤ 0 as indicating no agreement and 0.01–0.20 as none to slight, 0.21–0.40 as fair, 0.41– 0.60 as moderate, 0.61–0.80 as substantial, and 0.81–1.00 as almost perfect agreement." 
@@ -487,11 +487,11 @@ oof_metrics_B$confusion_matrix
 oof_metrics_NB$confusion_matrix
 ```
 
-As we can see the reported OOF Accuracy is very similar to the actual CV Accuracy, which supports the use of these metrics in model selection.
+As we can see the reported OOF Accuracy is very similar to that of the original CV, which supports the use of these extra metrics as criteria together with the accuracy. 
 
 From before, the Betting model's original CV accuracy is slightly higher than the Non-Betting model's. The OOF predictions' metrics are consistent with this - not only higher in accuracy, but also Macro Precision, Macro Recall, Macro F1 score and Cohen's Kappa.
 
-The class-specific statistics and the confusion matrices do reveal that the Betting model wasn't entirely dominant in its OOF predictions - the Non-Betting model predicted more Home wins correctly, which lead to it having a higher Home win Recall. However, this can be attributed to it just predicting a Home win more for every class.
+The class-specific statistics and the confusion matrices do reveal that the Betting model wasn't entirely dominant in its OOF predictions - the Non-Betting model predicted more Home wins correctly, which lead to it having a higher Home win Recall. However, this could potentially be attributed to it just predicting Home wins more frequently over the dataset.
 
 Furthermore, the overall pattern was similar in both. In particular they were both extremely weak at classifying Draws correctly from the pool of data that were Draws - both floating around 10-11% Draw Recall. Their Precision when they did predict a Draw was also lower than corresponding Home/Away win Precision but not by as large a margin. In contrast, both model's best scoring metric relatively was the Home win Recall.
 
@@ -517,15 +517,9 @@ impute_vars <- c(
   "IWH", "IWD", "IWA"
 )
 
-selected_predictors_imputed <- unique(c(
-  selected_predictors_B,
-  impute_vars
-))
+selected_predictors_imputed <- unique(c(selected_predictors_B, impute_vars))
 
-train_imp <- train_data[
-  , c("FTR", selected_predictors_imputed),
-  drop = FALSE
-]
+train_imp <- train_data[, c("FTR", selected_predictors_imputed), drop = FALSE]
 ```
 
 Using `mice` package for multiple imputation:
@@ -596,7 +590,7 @@ imputed_svm_predictions4 <- predict(imputed_svm4, newdata = train_imp_filled4)
 imputed_svm_predictions5 <- predict(imputed_svm5, newdata = train_imp_filled5)
 ```
 
-Now we can get an idea of how the metrics vary across the multiple imputation:
+Now we can get an idea of how the metrics vary across the five imputations:
 
 ```{r}
 imputed_metrics1 <- calculate_metrics(actual = train_imp_filled1$FTR, predicted = imputed_svm_predictions1)
@@ -647,7 +641,7 @@ Each metric has an extremely low standard deviation across imputations. This ind
 
 Furthermore the metrics were higher across the board than the Out-Of-Fold ones obtained by the best SVMs during cross validation. However as stated previously, this was expected since these metrics were calculated using predictions of the same datasets that the imputed models were trained on. In fact, the baseline models actually also performed better on their own training data. Therefore we cannot use this as evidence of better performance without doing Cross Validation on the imputed models. 
 
-Comparing the training performances of the baseline models and the imputed models, it suggests that adding betting odds as a predictor improves predictive performance, but does not keep stacking with more and more sites, i.e. there isn't any extra predictive power to be gleaned from multiple different sites in this experiment. Again though as this is only based on training performance and the betting odds can potentially interact in different ways with the match statistics and each other, no definitive conclusions should be made.
+Comparing the training performances of the baseline models and the imputed models, it suggests that adding betting odds as a predictor improves predictive performance, but does not keep stacking with more and more sites, i.e. there isn't any extra predictive power to be gleaned from multiple different sites in this experiment. Again though as this is only based on training performance and the betting odds can potentially interact in different ways with the match statistics and each other, no definitive conclusions can be made.
 
 Although the imputed datasets were not in consideration for building our final model, the patterns shown by these results are similar to what has been seen before. Hence this acts as useful information about how an SVM may perform if an imputation was required.
 
@@ -700,17 +694,18 @@ Confusion matrix
 test_metrics$confusion_matrix
 ```
 
-These metrics reveal the overall classification performance of the best model. Clearly the SVM had a strong problem with identifying a draw, though its accuracy for away and especially home wins was relatively good. This is a consistent pattern with the baseline models' performance on the training data and this particular SVM's OOF performance. 
+These metrics reveal the overall classification performance of the best model. Clearly the SVM struggled a lot with identifying draws, though its accuracy for away and especially home wins was relatively good. This is a consistent pattern with the baseline models' performance on the training data and this particular SVM's OOF performance. 
 
 Interestingly, the accuracy (and actually all of the other metrics) reported on the test set ended up being higher than on the Out-Of-Fold Validation data. They were also even higher than the respective metrics of the models that were predicting results on their own training data.
 
-Earlier analysis of the data had revealed that the lower leagues had a smaller proportion of home wins and a higher proportion of draws in comparison with the Premier League. Thus it is possible that this fact contributed to the increase in overall accuracy, along with the other metrics. This is useful to consider when thinking about if the data from the lower leagues lends itself to training models for use on the Premier League.
+Earlier analysis of the data had revealed that the lower leagues had a smaller proportion of home wins and a higher proportion of draws in comparison with the Premier League. Thus it is possible that this fact could have contributed to the increase in overall accuracy, along with the other metrics, though it's not proven. This is useful to consider when thinking about if the data from the lower leagues lends itself to training models for use on the Premier League.
 
 As another assessment of the model's classification performance, we can plot ROC curves for each of the outcomes:
 
 ```{r}
 prob_B <- attr(test_predictions, "probabilities")
 actual <- factor(test_data$FTR, levels = c("H", "D", "A"))
+prob_B <- prob_B[, levels(actual), drop = FALSE]
 
 roc_H <- roc(actual == "H", prob_B[, "H"], quiet = TRUE)
 roc_D <- roc(actual == "D", prob_B[, "D"], quiet = TRUE)
@@ -775,7 +770,9 @@ heatmap.2(
 
 Unsurprisingly the pairs of predictors with the highest positive correlation were between Shots/Shots on Target, Fouls/Yellows, Fouls/Reds for both Home and Away. The largest negative correlation was between the Bet365 Home/Away opening odds. Interestingly, the Draw odds seemed more varied - they had strong positive correlation with the Away win odds, but quite weak negative correlation with those for Home wins. 
 
-Next let's focus in on the importance of each predictor. We can measure importance by checking how much the accuracy of the SVM's predictions changes when randomly shuffling the values for each of the variables at a time (with a set seed). The more the accuracy decreases after shuffling, the more important the predictor. 
+Next let's focus in on the importance of each predictor. We can measure importance by checking how much the accuracy of the SVM's predictions changes when randomly shuffling the values for each of the variables at a time (with a set seed). The more the accuracy decreases after shuffling, the more important the predictor.
+
+For this test, we are only shuffling each variable once to avoid lengthy computation, so it should be kept in mind that the seed used for randomisation may have a small influence on the final score (this effect should hopefully be minimal over such a large data set). 
 
 Calculating the importance scores for each predictor:
 
@@ -812,7 +809,7 @@ par(mar = c(5,9,4,2), mgp = c(4,1,0))
 
 barplot(importance_scores, horiz = TRUE, las = 1, border = NA, col = "steelblue",
         main = "Permutation Importance for the Best Betting Odds SVM",
-        xlab = "Decrease in test accuracy when left out",
+        xlab = "Decrease in test accuracy after shuffling",
         ylab = "Predictor",
         xlim = c(-0.01, 0.08),
         xaxt = "n", cex.names = 0.85, cex.axis = 0.85, cex.lab = 0.95, cex.main = 1)
@@ -821,7 +818,7 @@ axis(side = 1, at = seq(-0.01, 0.08, by = 0.01), labels = sprintf("%.2f", seq(-0
 abline(v = 0, lty = 2)
 ```
 
-From this we can see that Home and Away Shots on Target were found to have the biggest impact on the accuracy when shuffled - about a 7-7.5% decrease. This was followed by the Bet365 Home and Away win odds, though curiously in the opposite order. On the opposite end, the number of fouls and yellow cards of each team being shuffled actually increased the test accuracy; suggesting these were almost useless for prediction.
+From this we can see that Home and Away Shots on Target were found to have the biggest impact on the accuracy when shuffled - about a 7-7.5% decrease. This was followed by the Bet365 Home and Away win odds, though curiously in the opposite order. On the opposite end, the number of fouls and yellow cards of each team being shuffled actually increased the test accuracy; suggesting these had little value for prediction individually.
 
 Zoning in on the most important predictors (AST, HST, B365H and B365A), we want to see how the predicted and actual outcomes are spread out across them. It makes sense to first do a comparison between AST and HST, which we will show using scatter plots:
 
@@ -876,7 +873,7 @@ odds_predicted <- data.frame(B365H = test_data$B365H, B365A = test_data$B365A,
                              Type = "SVM prediction")
 ```
 
-For the plotting, instead of the given values of the betting odds we will use 1/ them - which are roughly the implied probabilities of the site. This makes the visual comparison clearer.
+For the plotting, instead of the given values of the betting odds we will use 1/ them - which are roughly (NOT exactly) the implied probabilities of the site. This just makes the visual comparison clearer.
 
 ```{r}
 odds_actual$HomeProb <- 1 / odds_actual$B365H
@@ -907,7 +904,6 @@ ggplot(odds_compare, aes(x = HomeProb, y = AwayProb, colour = Result)) +
 ```
 
 Like with the Shots on Target comparison, the SVM seemed to have a stricter cutoff; usually predicting either outcome if it had an implied probability of above 0.5, though for these predictors it isn't as clear cut. This matches with the result of the calculated importance scores, which were lower for the odds than for the Shots on Target.
-
 
 Finally we will investigate how much of an effect the betting odds for a draw can have in helping the SVM predict it, as it was consistently the result it had the most trouble with. We will do a boxplot comparing B365D odds before kickoff between matches that actually finished in a draw and matches that didn't, to see if there is a noticeable difference in distribution. Firstly converting the outcomes to 2 results - whether its a draw or not:
 
@@ -952,9 +948,9 @@ test_metrics$overall
 
 including a test set accuracy of 60.14%. We also had a Macro-average AUC of 0.7363, and a Multi-class AUC of 0.7252.
 
-We also found that Draws were by far the hardest outcome for an SVM to classify, even with the positive boost gained from Bet365's opening odds.
+We also found that Draws were by far the hardest outcome for an SVM to classify, even with the additional information gained from Bet365's opening odds.
 
-Crucially, we showed that the performance of an SVM trained with lower league data on the Premier League could be of least a similar strength to its performance on its own training and validation data. This is evidence to support the use of lower league data in training models to be used on the Premier League.
+Crucially, we showed that the performance of an SVM trained with lower league data on the Premier League could be at least a similar strength to its performance on its own training and validation data. This can act as evidence to support the use of lower league data in training models to be used on the Premier League. We should mention again that the data used includes full time match statistics, so this doesn't necessarily translate to predictive models. 
 
 
 
