@@ -909,7 +909,7 @@ ggplot(odds_compare, aes(x = HomeProb, y = AwayProb, colour = Result)) +
 Like with the Shots on Target comparison, the SVM seemed to have a stricter cutoff; usually predicting either outcome if it had an implied probability of above 0.5, though for these predictors it isn't as clear cut. This matches with the result of the calculated importance scores, which were lower for the odds than for the Shots on Target.
 
 
-Finally we will investigate how much of an effect the betting odds for a draw helped the SVM predict it, as it was consistently the result it had the most trouble with. We will do a boxplot comparing B365D odds before kickoff between matches that actually finished in a draw and matches that didn't. Firstly converting the outcomes to 2 results - whether its a draw or not:
+Finally we will investigate how much of an effect the betting odds for a draw can have in helping the SVM predict it, as it was consistently the result it had the most trouble with. We will do a boxplot comparing B365D odds before kickoff between matches that actually finished in a draw and matches that didn't, to see if there is a noticeable difference in distribution. Firstly converting the outcomes to 2 results - whether its a draw or not:
 
 ```{r}
 draw_data <- data.frame(
@@ -940,6 +940,21 @@ ggplot(draw_data, aes(x = Outcome, y = B365D, fill = Outcome)) +
 ```
 
 These boxplots looking broadly similar is consistent with the SVM's struggles to classify a draw. It had been hoped that the Draw odds would have provided helpful information, yet we can see that the Bet365 Draw Odds alone do not largely differ between matches that were a draw and those that weren't. This doesn't give the full picture, as they could give stronger support in combination with other features - but as shown before, the match statistics by themselves also had a very low prediction accuracy on the training data for draws, so the improvement being limited is not surprising.
+
+
+**6. Conclusions**
+
+For our chosen 'best' SVM model, we got the following test metrics:
+
+```{r}
+test_metrics$overall
+```
+
+including a test set accuracy of 60.14%. We also had a Macro-average AUC of 0.7363, and a Multi-class AUC of 0.7252.
+
+We also found that Draws were by far the hardest outcome for an SVM to classify, even with the positive boost gained from Bet365's opening odds.
+
+Crucially, we showed that the performance of an SVM trained with lower league data on the Premier League could be of least a similar strength to its performance on its own training and validation data. This is evidence to support the use of lower league data in training models to be used on the Premier League.
 
 
 
