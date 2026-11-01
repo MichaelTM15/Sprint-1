@@ -10,7 +10,7 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
  
  
-*0. Introduction*
+## 0. Introduction
 
 In this file we will investigate missingness in the data sets that were exported after the EDA, and fit a chosen Support Vector Machine model to the data with selected predictors. 
 
@@ -31,7 +31,7 @@ library(gplots)
 As some files need to be imported from my folder in the repository (MichaelM), the working directory should be set to "~/GitHub/Sprint-1" or equivalent.
 
 
-**1. Data Pre-Processing and Missingness Analysis**
+## 1. Data Pre-Processing and Missingness Analysis
 
 Firstly we import the test and training data that was left after the EDA:
 
@@ -155,7 +155,7 @@ nrow(train_data_B)
 Again for now we are fine to use this as training data without imputation, but we will do imputation later.
 
 
-**2. Fitting the Baseline SVM models**
+## 2. Fitting the Baseline SVM models
 
 Now we can train an SVM for each training dataset. First the Non-Betting model:
 
@@ -280,7 +280,7 @@ Although the specific boundaries of this scale are critiqued in the same article
 We have a slight idea now of how the SVMs are doing with this classification (the performance shown by the metrics might be a bit optimistic as the SVMs were trained on the same datasets that they are being assessed on), though we will have to dig deeper into this by performing Cross Validation before drawing any conclusions.
 
 
-**3. Finding the Strongest Models through K-fold Cross Validation, and CV Performance Comparison**3
+## 3. Finding the Strongest Models through K-fold Cross Validation, and CV Performance Comparison
 
 Here we perform 5-Fold Cross Validation to get the best combination of parameter values for 'cost' and 'gamma'. 
 We loop through 3 values of each: for cost 0.5, 2, and 8; for gamma 0.01, 0.05 and 0.2 therefore 9 combinations.
@@ -498,7 +498,7 @@ Furthermore, the overall pattern was similar in both. In particular they were bo
 While the differences in the OOF prediction metrics, as well as the difference in actual CV accuracy, are small, in combination the evidence points towards the best Betting SVM as our choice of model. We will move forward with analyzing its performance on the test data, after a short detour on imputation.
 
 
-**4. Imputation Test**
+## 4. Imputation Test
 
 In this section we will perform imputation on the training data. We already have our chosen model, therefore this section will just be a separate experiment, that unfortunately couldn't be utilised. The reason for this is that the missingness was just too high across the board to justify, and it would have also required imputation on the test set for the final evaluation if it was selected. 
 
@@ -652,7 +652,7 @@ Comparing the training performances of the baseline models and the imputed model
 Although the imputed datasets were not in consideration for building our final model, the patterns shown by these results are similar to what has been seen before. Hence this acts as useful information about how an SVM may perform if an imputation was required.
 
 
-**5. Evaluating the best Betting SVM on the test data**
+## 5. Evaluating the best Betting SVM on the test data
 
 Now we can move onto evaluating the performance of our chosen 'best' SVM from Section 3 on the test data. Firstly there is something we must have in order to later plot the ROC curves - the prediction probabilities. Luckily as we already have the best parameters, we can just refit the same model, but retaining the probability estimates this time.
 
@@ -942,7 +942,7 @@ ggplot(draw_data, aes(x = Outcome, y = B365D, fill = Outcome)) +
 These boxplots looking broadly similar is consistent with the SVM's struggles to classify a draw. It had been hoped that the Draw odds would have provided helpful information, yet we can see that the Bet365 Draw Odds alone do not largely differ between matches that were a draw and those that weren't. This doesn't give the full picture, as they could give stronger support in combination with other features - but as shown before, the match statistics by themselves also had a very low prediction accuracy on the training data for draws, so the improvement being limited is not surprising.
 
 
-**6. Conclusions**
+## 6. Conclusions
 
 For our chosen 'best' SVM model, we got the following test metrics:
 
