@@ -28,7 +28,7 @@ library(patchwork)
 library(gplots)
 ```
 
-As some files need to be imported, the working directory should be set to "~/GitHub/Sprint-1" or equivalent.
+As some files need to be imported from my folder in the repository (MichaelM), the working directory should be set to "~/GitHub/Sprint-1" or equivalent.
 
 
 **1. Data Pre-Processing and Missingness Analysis**
