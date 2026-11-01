@@ -14,4 +14,4 @@ Evidence:
 
 Our working is shown in our own directories.
 
-Michael did the EDA and fitted the SVM model, David fitted the XGBoost Model, Astijus fitted the Multinomial Logistic Regression, and Binquan fitted the Random Forests and did some extra EDA. 
+Michael did the initial EDA and fitted the SVM model, David fitted the XGBoost Model, Astijus fitted the Multinomial Logistic Regression Model, and Binquan fitted the Random Forests and did some extra EDA. 
