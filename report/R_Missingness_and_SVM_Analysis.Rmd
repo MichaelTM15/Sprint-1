@@ -8,11 +8,15 @@ output: html_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
-```{r}
-setwd("~/GitHub/Sprint-0/MichaelM")
-```
+ 
+ 
+*0. Introduction*
 
-*Packages to load*
+In this file we will investigate missingness in the data sets that were exported after the EDA, and fit a chosen Support Vector Machine model to the data with selected predictors. 
+
+SVMs offer  many advantages over other classification methods - the main one being that they use the decision boundary with the maximum margin between classes. This in theory makes them stronger than other decision boundary based classifiers like logistic regression. They also don't need this decision boundary to be linear. Furthermore SVMs generally perform well on a high-dimensional data without much memory usage needed for predictions once fitted.
+
+Packages to load in order to run the file:
 
 ```{r}
 library(e1071)
@@ -23,6 +27,9 @@ library(ggplot2)
 library(patchwork)
 library(gplots)
 ```
+
+As some files need to be imported, the working directory should be set to "~/GitHub/Sprint-1" or equivalent.
+
 
 **1. Data Pre-Processing and Missingness Analysis**
 
@@ -744,7 +751,7 @@ print(multiclass_auc)
 
 Either can be used but they are calculated differently. The Macro-average AUC gives each outcome the same weighting and averages each of their one-vs-rest AUCs. Meanwhile the Multi-class AUC uses the pairwise AUCs (not on the graph) for each combination of outcomes and averages between them.  
 
-From the ROC curves, we can see that while obviously the Draw outcome had the lowest AUC, the highest AUC was actually for Away wins. This differs from the hierarchy established by the class-specific Recall, Precision and F1 scores, where Home win was king. This suggests that although the SVM had more success classifying Home wins at its own probability decision threshold, the prediction probabilities it calculated were overall better - when going over all thresholds - at distinguishing Away wins from the other outcomes. 
+From the ROC curves, we can see that while obviously the Draw outcome's ROC curve was dominated by the other two, and it had the lowest AUC, the highest AUC was actually for Away wins. This differs from the hierarchy established by the class-specific Recall, Precision and F1 scores, where Home win was king. This suggests that although the SVM had more success classifying Home wins at its own probability decision threshold, the prediction probabilities it calculated were overall better - when going over all thresholds - at distinguishing Away wins from the other outcomes. 
 
 We would like to further investigate the importance of the selected predictors. Before we begin, we will first create a heatmap to see the relationships they have with each other:
 
@@ -858,7 +865,82 @@ ggplot(ST_compare, aes(x = HST, y = AST, colour = Result)) +
 
 These are split with a diagonal line where the number of home/away shots on target are equal, and being above/below the line corresponds to more away/home shots on target, respectively. From this we can see that the SVM predicted quite rigidly whichever team had more shots on target. That is not to say the SVM went solely by this principle, as there are some noticeable exceptions seen in the scatter graph - however, while the actual results have a similar trend, it is more mixed, particularly around the separating line. 
 
-We will now 
+We will now plot this same comparison between the Bet365 Home and Away odds. First creating the tables of values of B365A/H with the actual and predicted outcomes:
+
+```{r}
+odds_actual <- data.frame(B365H = test_data$B365H, B365A = test_data$B365A,
+                          Result = factor(test_data$FTR, levels = c("H", "D", "A")), 
+                          Type = "Actual result")
+odds_predicted <- data.frame(B365H = test_data$B365H, B365A = test_data$B365A,
+                             Result = factor(test_predictions, levels = c("H", "D", "A")),
+                             Type = "SVM prediction")
+```
+
+For the plotting, instead of the given values of the betting odds we will use 1/ them - which are roughly the implied probabilities of the site. This makes the visual comparison clearer.
+
+```{r}
+odds_actual$HomeProb <- 1 / odds_actual$B365H
+odds_actual$AwayProb <- 1 / odds_actual$B365A
+odds_predicted$HomeProb <- 1 / odds_predicted$B365H
+odds_predicted$AwayProb <- 1 / odds_predicted$B365A
+
+odds_compare <- rbind(odds_actual, odds_predicted)
+```
+
+Now showing the graphs side by side:
+
+```{r}
+ggplot(odds_compare, aes(x = HomeProb, y = AwayProb, colour = Result)) +
+  geom_point(alpha = 0.45, size = 1.5) +
+  facet_wrap(~Type) +
+  scale_colour_manual(
+    values = c("H" = "aquamarine", "D" = "darksalmon", "A" = "deeppink3"),
+    labels = c("H" = "Home win", "D" = "Draw", "A" = "Away win")
+  ) +
+  labs(
+    title = "Actual vs SVM-Predicted Results by Bet365 Odds",
+    x = "Bet365 home-win probability (B365H)",
+    y = "Bet365 away-win probability (B365A)",
+    colour = "Match result"
+  ) +
+  theme_minimal(base_size = 12)
+```
+
+Like with the Shots on Target comparison, the SVM seemed to have a stricter cutoff; usually predicting either outcome if it had an implied probability of above 0.5, though for these predictors it isn't as clear cut. This matches with the result of the calculated importance scores, which were lower for the odds than for the Shots on Target.
+
+
+Finally we will investigate how much of an effect the betting odds for a draw helped the SVM predict it, as it was consistently the result it had the most trouble with. We will do a boxplot comparing B365D odds before kickoff between matches that actually finished in a draw and matches that didn't. Firstly converting the outcomes to 2 results - whether its a draw or not:
+
+```{r}
+draw_data <- data.frame(
+  B365D = test_data$B365D,
+  Outcome = factor(
+    ifelse(test_data$FTR == "D", "Draw", "Not a draw"),
+    levels = c("Not a draw", "Draw")
+  )
+)
+```
+
+then making the boxplots:
+
+```{r}
+ggplot(draw_data, aes(x = Outcome, y = B365D, fill = Outcome)) +
+  geom_boxplot(alpha = 0.75, na.rm = TRUE) +
+  scale_fill_manual(
+    values = c("Not a draw" = "brown1", "Draw" = "chartreuse")
+  ) +
+  labs(
+    title = "Bet365 Draw Odds by Actual Match Outcome",
+    x = "Actual match outcome",
+    y = "Bet365 draw odds (B365D)"
+  ) +
+  coord_flip() + 
+  theme_minimal(base_size = 12) +
+  theme(legend.position = "none")
+```
+
+These boxplots looking broadly similar is consistent with the SVM's struggles to classify a draw. It had been hoped that the Draw odds would have provided helpful information, yet we can see that the Bet365 Draw Odds alone do not largely differ between matches that were a draw and those that weren't. This doesn't give the full picture, as they could give stronger support in combination with other features - but as shown before, the match statistics by themselves also had a very low prediction accuracy on the training data for draws, so the improvement being limited is not surprising.
+
 
 
 ```{r}
