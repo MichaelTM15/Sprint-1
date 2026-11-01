@@ -162,7 +162,7 @@ legend("topright",
 
 ```
 
-Instinctively, it makes sense to remove the closing odds as variables as they are technically created with knowledge of the match outcome. We can also show how closely they interact with the opening odds for each betting site:
+Instinctively, it makes sense to remove the one of either the opening and closing odds as variables as they should be heavily correlated and are set to serve a similar purpose. We can show how closely they interact with each other for each betting site:
 
 ```{r}
 par(mfrow=c(2,2))
