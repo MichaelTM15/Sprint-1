@@ -14,7 +14,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 In this file we will import the dataset, perform some Exploratory Data Analysis on it and export half-cleaned full, training and test datasets for later use to fit classification models. 
 
-We are pulling all our data from https://football-data.co.uk/data.php, a site containing results, match statistics and betting odds since the 2003/2004 season, and basic stats since the second Premier League season in 1993/94. The data is noted to be free to use for private individuals, but not for commercial use. The website also contains data for other countries' leagues, a collection of betting articles and various other resources.
+We are pulling all our data from https://football-data.co.uk/data.php, a site containing results, match statistics and betting odds since the 2003/2004 season, and basic stats since the second Premier League season in 1993/94. The website states that the data is free to use for private individuals, but not for commercial use (including products trained on the data). The website also contains data for other countries' leagues, a collection of betting articles and various other resources.
 
 We won't go through the names and meanings of all of the recorded variables, but they can be viewed here https://football-data.co.uk/notes.txt 
 
@@ -173,9 +173,9 @@ legend("topright",
        cex=0.8)
 ```
 
-This shows that the leagues have largely similar distributions of outcomes between these seasons, which is evidence that points in favour of being able to use the data for predictions across division.  
+This shows that the leagues have largely similar distributions of outcomes between these seasons, which suggests it may be possible to use the data for predictions across division.  
 
-The main noticeable difference between the Premier League and the lower leagues is that there are a lesser proportion of draws in the top league - and this deficit seems to be almost entirely made up in a higher proportion of Home wins. This suggests that having the home advantage may have a stronger effect that tips a draw into a win for the home team, more times on average in the top division. 
+The main noticeable difference between the Premier League and the lower leagues is that there is a lower proportion of draws in the top league - and this deficit seems to be almost entirely made up in a higher proportion of Home wins. This could suggest that having the home advantage may have a stronger effect that tips a draw into a win for the home team, more times on average in the top division. 
 
 But this doesn't tell the full tale - as it's an aggregated proportion over 23 years. It could be that in the seasons themselves, vastly different things were happening in each league. Therefore we will plot line graphs for these outcome proportions for each league over time:
 
@@ -206,7 +206,7 @@ for(league in leagues){
 
 From these we can see that even with a few slight seasonal fluctuations, the pattern across all leagues was broadly similar. The Home win took the largest chunk of the overall proportion across pretty much all seasons for each league, with the Draw and Away win amounts being quite similar in each.
 
-Another thing to look into is even if the outcome is the same, how did the scores compare? For example a full time score 3-3 is much different to Nil-Nil - it tells us that the match was much more open and attacking from both sides, which let goals flow in on either end. Thus we will create a table showing the average Home/Away goals and goal H-A goal difference per game:
+Another thing to look into is even if the outcome is the same, how did the scores compare? For example a full time score 3-3 is much different to Nil-Nil - it tells us that the match was much more open and attacking from both sides, which let goals flow in on either end. Thus we will create a table showing the average Home/Away goals and Home minus Away goal difference per game:
 
 ```{r}
 goal_averages<-aggregate(cbind(FTHG, FTAG) ~ League, data = data, FUN=mean, na.rm=TRUE)
@@ -261,7 +261,7 @@ plot(data$B365D, data$B365CD, xlab = "Bet365 Draw Opening Odds", ylab = "Bet365 
 par(mfrow=c(1,1))
 ```
 
-Unsurprisingly, the Pearson Correlation Coefficient `r` is extremely high for all three cases, representing very strong positive correlation. A table can be plotted for the full results with N the number of observations each value of `r` is calculated from:
+Unsurprisingly, the Pearson Correlation Coefficient `r` is extremely high for all three cases, representing very strong positive correlation. We can plot a table for the full results with N the number of observations each value of `r` is calculated from:
 
 ```{r}
 bookmakers<-c("B365", "BW", "IW", "WH", "VC", "PS", "BF", "BFD", "BFE", "BMGM", "BV", "CL", "LB", "X1XB")
@@ -285,8 +285,8 @@ outcomes_AH<-c("H", "A")
 results_AH<-data.frame()
 for (company in bookmakers_AH){
     for (outcomeAH in outcomes_AH){
-        opening<-paste0(company, "AH", outcome)
-        closing<-paste0(company, "CAH", outcome)
+        opening<-paste0(company, "AH", outcomeAH)
+        closing<-paste0(company, "CAH", outcomeAH)
         valid<-complete.cases(data[, c(opening, closing)])
         results_AH<-rbind(results_AH, data.frame(
             Bookmaker=company,
@@ -336,12 +336,14 @@ all_results
 The rest of the results mostly follow this behaviour - with the exception of the Asian Handicap odds for some reason. While they are a different type of betting odd to the standard, the intra-market relation should still be close, just as with the 1x2 and Over/Under 2.5 odds. We can investigate to see what is happening, using the Bet365 AH Home odds as an example:
 
 ```{r}
-plot(data$B365AHH[valid],data$B365CAHH[valid],
+valid_AH<-complete.cases(data[, c("B365AHH", "B365CAHH")])
+
+plot(data$B365AHH[valid_AH],data$B365CAHH[valid_AH],
      xlab = "Opening Asian Handicap Home Odds",
      ylab = "Closing Asian Handicap Home Odds",
      main = "Bet365 Asian Handicap Odds")
 
-abline(lm(data$B365CAHH[valid] ~ data$B365AHH[valid]), col = "purple", lwd = 2)
+abline(lm(data$B365CAHH[valid_AH] ~ data$B365AHH[valid_AH]), col = "purple", lwd = 2)
 ```
 
 The data does look completely uncorrelated, which is strange, but nothing is going wrong with the calculation. This remains a question, but not one we will be needing to answer due to how we are going to create the training and test data sets.
@@ -351,22 +353,22 @@ The data does look completely uncorrelated, which is strange, but nothing is goi
 
 Now we will begin to remove some variables that we don't want the classification models to use. The obvious ones include Full Time Home/Away goals, as in combination these just give the Full Time Result. Furthermore we don't want any number of goals at Halftime to be shown either, as this gives too much information (as does the Halftime Result, clearly). 
 
-The Time and Referee variables shouldn't contain any predictive information, so we don't want to introduce a variance to any model which trains on these. 
+We decided to not include the Time of kickoff and name of the Referee as we don't want to introduce unnecessary variance to any model which trains on these, in case there happens to be some association to match results. 
 
-Date and Season, and Division and League respectively overlap with each other. We want to consider the lower leagues as a full, combined dataset, which is why we removed it. Changes in the football landscape over any course of time is very complex to model, and we don't want to have to deal with assuming any dependence between the results. So we remove when the games were played and treat each match and independent of each other and of when it was played.
+Date and Season, and Division and League respectively overlap with each other. We want to consider the lower leagues as a full, combined dataset, which is why we removed it. Taking into account changes in the football landscape over time is a complex task when creating a model, and we don't want to have to deal with assuming any dependence between the results. So we remove when the games were played and treat each match as independent of the others and of when it was played.
 
 Some less obvious variables we remove are the Home and Away Team names. This is to prevent the models from trying to learn which teams are stronger, which can change between seasons (which we've already removed).
 
 'X' was a dummy variable that was N/A in all rows. Grouping it and all the other variables just mentioned:
 
 ```{r}
-remove_vars_0<-c("Div", "Date", "HomeTeam", "AwayTeam", "Referee", "Time", "Date", "X", "Season", "League", "FTHG", 
+remove_vars_0<-c("Div", "Date", "HomeTeam", "AwayTeam", "Referee", "Time", "X", "Season", "League", "FTHG", 
                  "FTAG", "HTAG", "HTHG", "HTR")
 ```
 
 Now there are a lot of Betting Odds that we will remove. All summary statistics, including maximum and average odds, and the number of bookmakers to calculate the average odds, are removed as they are trivial to calculate. 
 
-Due to the results of the earlier investigation,  we had the decision to remove either opening or closing odds from the bookmakers as they were so heavily correlated with each other across the board. Ultimately we chose to keep the opening odds, as they are more of a reflection of the betting site's opinion before being influenced by market reactions. One could use the closing odds instead, or both, but for our experiment the opening odds fit the purpose we wanted them for better.
+Due to the results of the earlier investigation,  we had the decision to remove either opening or closing odds from the bookmakers as they were so heavily correlated with each other across the board. Ultimately we chose to keep the opening odds, as they are more of a reflection of the betting site's initial opinion before being influenced by any kind of market reactions. One could use the closing odds instead, or both, but for our experiment the opening odds fit the purpose we wanted them for better.
 
 Putting together all of the odds to remove:
 
@@ -443,7 +445,7 @@ make_heatmap(test_data, "Test Data Predictor Heatmap")
 
 The predictors seem to interact in a broadly similar way across the training and test sets, though they are not completely identical.
 
-In the following files we will go on to fit various classification models to the training data, and ultimately evaluate performance on the test data. Hopefully we can then choose a best method, and answer whether or not the lower leagues' data is enough to train a classification model on for use in the Premier League. 
+In the following files we will go on to fit various classification models to the training data, and ultimately evaluate performance on the test data. Hopefully we can then decide on which method is best, and answer whether or not the lower leagues' data is sufficient for training a classification model on for use in the Premier League. 
 
 
 
