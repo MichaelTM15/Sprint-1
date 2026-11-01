@@ -16,6 +16,14 @@ In this file we will import the dataset, perform some Exploratory Data Analysis 
 
 We are pulling all our data from https://football-data.co.uk/data.php, a site containing results, match statistics and betting odds since the 2003/2004 season, and basic stats since the second Premier League season in 1993/94. The data is noted to be free to use for private individuals, but not for commercial use. The website also contains data for other countries' leagues, a collection of betting articles and various other resources.
 
+We won't go through the names and meanings of all of the recorded variables, but they can be viewed here https://football-data.co.uk/notes.txt 
+
+Packages to load in order to run the file:
+
+```{r}
+
+```
+
 
 ## 1. Data Import
 
@@ -125,6 +133,12 @@ data_list<-lapply(data_list, function(df){
 data<-do.call(rbind, data_list)
 ```
 
+Let's see the first few rows:
+
+```{r}
+head(data, 4)
+```
+
 Exporting so that other group members can access: (I've made this into a comment so it doesn't recreate an identical Excel file that overwrites itself each times the file is run)
 
 ```{r}
@@ -161,7 +175,7 @@ legend("topright",
 
 This shows that the leagues have largely similar distributions of outcomes between these seasons, which is evidence that points in favour of being able to use the data for predictions across division.  
 
-The main noticeable difference between the Premier League and the lower leagues is that there are a lesser proportion of draws in the top league - and this defecit seems to be almost entirely made up in a higher proportion of Home wins. This suggests that having the home advantage may have a stronger effect that tips a draw into a win for the home team, more times on average in the top division. 
+The main noticeable difference between the Premier League and the lower leagues is that there are a lesser proportion of draws in the top league - and this deficit seems to be almost entirely made up in a higher proportion of Home wins. This suggests that having the home advantage may have a stronger effect that tips a draw into a win for the home team, more times on average in the top division. 
 
 But this doesn't tell the full tale - as it's an aggregated proportion over 23 years. It could be that in the seasons themselves, vastly different things were happening in each league. Therefore we will plot line graphs for these outcome proportions for each league over time:
 
@@ -189,6 +203,247 @@ for(league in leagues){
        lty=1, lwd=2, cex=0.7)
 }
 ```
+
+From these we can see that even with a few slight seasonal fluctuations, the pattern across all leagues was broadly similar. The Home win took the largest chunk of the overall proportion across pretty much all seasons for each league, with the Draw and Away win amounts being quite similar in each.
+
+Another thing to look into is even if the outcome is the same, how did the scores compare? For example a full time score 3-3 is much different to Nil-Nil - it tells us that the match was much more open and attacking from both sides, which let goals flow in on either end. Thus we will create a table showing the average Home/Away goals and goal H-A goal difference per game:
+
+```{r}
+goal_averages<-aggregate(cbind(FTHG, FTAG) ~ League, data = data, FUN=mean, na.rm=TRUE)
+names(goal_averages)<-c("League", "Average Home Goals", "Average Away Goals")
+goal_averages$`Average H-A Goal Difference`<-goal_averages$`Average Home Goals` - goal_averages$`Average Away Goals`
+
+goal_averages
+```
+
+Like with the outcomes we can put this into bar charts:
+
+```{r}
+par(mfrow=c(1,3))
+league_labels<-c("CH", "L1", "L2", "PL")
+
+barplot(goal_averages$`Average Home Goals`,
+        names.arg = league_labels,
+        main = "Avg HG/Match by League",
+        xlab = "League",
+        ylab = "Average Goals",
+        ylim = c(0, 1.5))
+barplot(goal_averages$`Average Away Goals`,
+        names.arg = league_labels,
+        main = "Avg AG/Match by League",
+        xlab = "League",
+        ylab = "Average Goals",
+        ylim = c(0,1.5))
+barplot(goal_averages$`Average H-A Goal Difference`,
+        names.arg = league_labels,
+        main = "Avg HG-AG Diff/Match by League",
+        xlab = "League",
+        ylab = "Average Goals Difference",
+        ylim = c(0,0.4))
+```
+
+With both higher Home and Away goals than the others, the Premier League is the league with the biggest scorelines. However, the Home advantage still seems to be the biggest difference maker, as it actually still has the largest average difference in goals between the teams. In fact, one can see that the average H-A goal difference increases going up each rung of the league ladder - with the largest jump from the Championship to the PL.
+
+This doesn't prove that the PL is necessarily the 'most attacking'. As each club will play each other twice per season; once Home and once Away, the higher Away goals could potentially be inflated by the stronger teams in the case that the Premier League has the largest 'skill' difference between its top dogs and the rest of the pack.
+
+The more interesting variables included in the dataset include all of the many betting odds. Both Opening and Closing Odds are recorded for each bookmaker in each market. There are 3 main markets: 1x2 (the standard, where you just predict the result); Over/Under 2.5 total goals (as it sounds); and Asian Handicap (a bit more complicated, it gives the 'better' team a handicap to overcome). 
+
+We may want to see how the Opening and Closing Odds relate to each other across the dataset. There are a lot of betting sites, so for now we will only show the correlation plots for the Bet365 Opening and Closing outcomes for each of the three outcomes:
+
+```{r}
+par(mfrow=c(2,2))
+
+plot(data$B365H, data$B365CH, xlab = "Bet365 Home Opening Odds", ylab = "Bet365 Home Closing Odds", main = (paste("r=", round(cor(data$B365H, data$B365CH, use = "complete.obs"), 3))))
+plot(data$B365A, data$B365CA, xlab = "Bet365 Away Opening Odds", ylab = "Bet365 Away Closing Odds", main = (paste("r=", round(cor(data$B365A, data$B365CA, use = "complete.obs"), 3))))
+plot(data$B365D, data$B365CD, xlab = "Bet365 Draw Opening Odds", ylab = "Bet365 Draw Closing Odds", main = (paste("r=", round(cor(data$B365D, data$B365CD, use = "complete.obs"), 3))))
+
+
+par(mfrow=c(1,1))
+```
+
+Unsurprisingly, the Pearson Correlation Coefficient `r` is extremely high for all three cases, representing very strong positive correlation. A table can be plotted for the full results with N the number of observations each value of `r` is calculated from:
+
+```{r}
+bookmakers<-c("B365", "BW", "IW", "WH", "VC", "PS", "BF", "BFD", "BFE", "BMGM", "BV", "CL", "LB", "X1XB")
+outcomes<-c("H", "D", "A")
+results<-data.frame()
+for (company in bookmakers){
+    for (outcome in outcomes){
+        opening<-paste0(company, outcome)
+        closing<-paste0(company, "C", outcome)
+        valid<-complete.cases(data[, c(opening, closing)])
+        results<-rbind(results, data.frame(
+            Bookmaker=company,
+            Outcome = outcome,
+            Correlation = round(cor(data[[opening]][valid], data[[closing]][valid]), 3), N=sum(valid)
+        ))
+    }
+}
+
+bookmakers_AH<-c("B365", "P", "BFE")
+outcomes_AH<-c("H", "A")
+results_AH<-data.frame()
+for (company in bookmakers_AH){
+    for (outcomeAH in outcomes_AH){
+        opening<-paste0(company, "AH", outcome)
+        closing<-paste0(company, "CAH", outcome)
+        valid<-complete.cases(data[, c(opening, closing)])
+        results_AH<-rbind(results_AH, data.frame(
+            Bookmaker=company,
+            Outcome = outcomeAH,
+            Correlation = round(cor(data[[opening]][valid], data[[closing]][valid]), 3), N=sum(valid)
+        ))
+    }
+}
+
+
+bookmakers_25O<-c("B365", "BFE")
+results_25O<-data.frame()
+for (company in bookmakers_25O){
+  opening<-paste0(company, ".2.5")
+  closing<-paste0(company, "C.2.5")
+  valid<-complete.cases(data[, c(opening, closing)])
+  results_25O<-rbind(results_25O, data.frame(
+    Bookmaker=company,
+    Outcome = "Over 2.5",
+    Correlation = round(cor(data[[opening]][valid], data[[closing]][valid]), 3), N=sum(valid)
+  ))
+}
+
+
+bookmakers_25U<-c("B365", "BFE")
+results_25U<-data.frame()
+for (company in bookmakers_25U){
+  opening<-paste0(company, ".2.5.1")
+  closing<-paste0(company, "C.2.5.1")
+  valid<-complete.cases(data[, c(opening, closing)])
+  results_25U<-rbind(results_25U, data.frame(
+    Bookmaker=company,
+    Outcome = "Under 2.5",
+    Correlation = round(cor(data[[opening]][valid], data[[closing]][valid]), 3), N=sum(valid)
+    ))
+}
+
+results$Market<-"1X2"
+results_AH$Market<-"Asian Handicap"
+results_25O$Market<-"Over/Under 2.5"
+results_25U$Market<-"Over/Under 2.5"
+all_results<-rbind(results, results_AH, results_25O, results_25U)
+all_results<-all_results[, c("Market", "Bookmaker", "Outcome", "Correlation", "N")]
+all_results
+```
+
+The rest of the results mostly follow this behaviour - with the exception of the Asian Handicap odds for some reason. While they are a different type of betting odd to the standard, the intra-market relation should still be close, just as with the 1x2 and Over/Under 2.5 odds. We can investigate to see what is happening, using the Bet365 AH Home odds as an example:
+
+```{r}
+plot(data$B365AHH[valid],data$B365CAHH[valid],
+     xlab = "Opening Asian Handicap Home Odds",
+     ylab = "Closing Asian Handicap Home Odds",
+     main = "Bet365 Asian Handicap Odds")
+
+abline(lm(data$B365CAHH[valid] ~ data$B365AHH[valid]), col = "purple", lwd = 2)
+```
+
+The data does look completely uncorrelated, which is strange, but nothing is going wrong with the calculation. This remains a question, but not one we will be needing to answer due to how we are going to create the training and test data sets.
+
+
+## 3. Creating the Train and Test data
+
+Now we will begin to remove some variables that we don't want the classification models to use. The obvious ones include Full Time Home/Away goals, as in combination these just give the Full Time Result. Furthermore we don't want any number of goals at Halftime to be shown either, as this gives too much information (as does the Halftime Result, clearly). 
+
+The Time and Referee variables shouldn't contain any predictive information, so we don't want to introduce a variance to any model which trains on these. 
+
+Date and Season, and Division and League respectively overlap with each other. We want to consider the lower leagues as a full, combined dataset, which is why we removed it. Changes in the football landscape over any course of time is very complex to model, and we don't want to have to deal with assuming any dependence between the results. So we remove when the games were played and treat each match and independent of each other and of when it was played.
+
+Some less obvious variables we remove are the Home and Away Team names. This is to prevent the models from trying to learn which teams are stronger, which can change between seasons (which we've already removed).
+
+'X' was a dummy variable that was N/A in all rows. Grouping it and all the other variables just mentioned:
+
+```{r}
+remove_vars_0<-c("Div", "Date", "HomeTeam", "AwayTeam", "Referee", "Time", "Date", "X", "Season", "League", "FTHG", 
+                 "FTAG", "HTAG", "HTHG", "HTR")
+```
+
+Now there are a lot of Betting Odds that we will remove. All summary statistics, including maximum and average odds, and the number of bookmakers to calculate the average odds, are removed as they are trivial to calculate. 
+
+Due to the results of the earlier investigation,  we had the decision to remove either opening or closing odds from the bookmakers as they were so heavily correlated with each other across the board. Ultimately we chose to keep the opening odds, as they are more of a reflection of the betting site's opinion before being influenced by market reactions. One could use the closing odds instead, or both, but for our experiment the opening odds fit the purpose we wanted them for better.
+
+Putting together all of the odds to remove:
+
+```{r}
+closing_odds<-grep("C(H|D|A)$|C\\.|CAH|AHCh", names(data), value=TRUE)
+max_avg_odds<-grep("^(Max|Avg|BbMx|BbAv)", names(data), value=TRUE)
+bookmaker_counts<-grep("^Bb(1X2|OU|AH)$", names(data), value=TRUE)
+odds_to_remove<-unique(c(closing_odds, max_avg_odds, bookmaker_counts))
+```
+
+We can now combine all of the variables to remove:
+
+```{r}
+remove_vars_1<-unique(c(remove_vars_0, odds_to_remove))
+remove_vars_1
+```
+
+Now creating the training and test data without columns of these variables:
+
+```{r}
+train_data<-data[
+  data$League %in% c("Championship", "League 1", "League 2"), 
+  !names(data) %in% remove_vars_1,
+  drop = FALSE
+]
+
+test_data<-data[
+  data$League %in% c("Premier League"), 
+  !names(data) %in% remove_vars_1,
+  drop = FALSE
+]
+```
+
+As before, exporting so that other group members can access: (I've made this into a comment again for the same reason)
+
+```{r}
+#write.csv(train_data, "../processed-data/football_train_data.csv", row.names = FALSE)
+
+#write.csv(test_data, "../processed-data/football_test_data.csv", row.names = FALSE)
+```
+
+
+
+
+## 4. Closing remarks and next steps
+
+We end with some heat maps of the predictors that survived, and are in the current training and test data. Keep in mind that not necessarily all of them will be used, as we have to undergo missingness checks and decide on whether or not imputation is wanted/needed. This will show how the relationships they have with each other look:
+
+```{r}
+make_heatmap<-function(dataset, plot_title){
+  numeric_data<-dataset[, sapply(dataset, is.numeric), drop = FALSE]
+  usable<-sapply(numeric_data, function(x){
+    sum(!is.na(x))>=2 && length(unique(x[!is.na(x)]))>1
+  })
+  numeric_data<-numeric_data[, usable, drop = FALSE]
+  correlations<-cor(numeric_data, use="pairwise.complete.obs")
+  
+  heatmap_colours<-colorRampPalette(c("yellow", "orange", "red"))(100)
+  heatmap(correlations, symm=TRUE, scale="none", col=heatmap_colours,
+          breaks=seq(-1,1,length.out=101), main=plot_title)
+  legend("topright", legend=c("Negative (~ -1)", "Zero (~ 0)", "Positive (~ +1)"),
+         fill=c("yellow", "orange", "red"), cex=0.7, bty="n")
+}
+# Just note that the color scale should be continuous but it's hard to see, i.e. orange doesn't mean exactly 0 etc.
+```
+
+```{r}
+make_heatmap(train_data, "Training Data Predictor Heatmap")
+```
+
+```{r}
+make_heatmap(test_data, "Test Data Predictor Heatmap")
+```
+
+The predictors seem to interact in a broadly similar way across the training and test sets, though they are not completely identical.
+
+In the following files we will go on to fit various classification models to the training data, and ultimately evaluate performance on the test data. Hopefully we can then choose a best method, and answer whether or not the lower leagues' data is enough to train a classification model on for use in the Premier League. 
 
 
 
