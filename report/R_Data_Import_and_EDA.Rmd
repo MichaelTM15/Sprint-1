@@ -1,0 +1,197 @@
+---
+title: "Data Import and EDA in R"
+author: "Michael McDonagh (2392623)"
+date: '2026'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+## 0. Introduction
+
+In this file we will import the dataset, perform some Exploratory Data Analysis on it and export half-cleaned full, training and test datasets for later use to fit classification models. 
+
+We are pulling all our data from https://football-data.co.uk/data.php, a site containing results, match statistics and betting odds since the 2003/2004 season, and basic stats since the second Premier League season in 1993/94. The data is noted to be free to use for private individuals, but not for commercial use. The website also contains data for other countries' leagues, a collection of betting articles and various other resources.
+
+
+## 1. Data Import
+
+First we download all of the files that we will be using. We chose to take all of the data for each of the four English leagues from the 2003/2004 season onwards. This was motivated by this being the first season where the website had recorded any bookmakers' odds. With one of our ideas to use the betting odds to improve the classifiers' performances, this felt like a natural cutoff point. While there are an increasing number of variables that are recorded season upon season, the only requirement to be downloaded was for any betting odds to be one of them.
+
+Getting the Excel files from the website:
+
+```{r}
+if(!dir.exists(file.path("..", "data"))){
+  dir.create(file.path("..", "data"))
+}
+
+years<-2003:2025
+
+# Splitting up the leagues
+
+leagues<-c(
+  E0 = "Premier_League",
+  E1 = "Championship",
+  E2 = "League_1",
+  E3 = "League_2"
+)
+
+for(year in years){
+  season<-paste0(
+    substr(year, 3, 4),
+    sprintf("%02d", (year+1) %% 100)
+  )
+  
+  for(league_code in names(leagues)){
+    league_name<-leagues[[league_code]]
+    
+    
+    file_name<-paste0(league_name, "_data_", season, ".csv")
+    file_path<-file.path("..", "data", file_name)
+    
+# Only downloading if not already there
+    
+    if(!file.exists(file_path)){
+      url<-paste0("https://football-data.co.uk/mmz4281/", season, "/", league_code, ".csv")
+      message("Downloading", file_name)
+      download.file(url, file_path)
+    }
+    else{
+      message("Already exists, skipping", file_name)
+    }
+  }
+
+}
+```
+
+Next creating a compiled data frame: all 4 leagues across all 23 seasons.
+
+```{r}
+files<-list.files(
+  file.path("..", "data"),
+  pattern = "\\.csv$",
+  full.names = TRUE
+)
+
+data_list<-list()
+
+for(i in seq_along(files)){
+  df<-read.csv(files[i])
+  
+# This deals with a bug in the data. Some rows of certain seasons had empty strings,
+# which caused additional matches to be added with no information.
+  df<-df[!is.na(df$Date) & df$Date!="", ]
+  
+  file_name<-basename(files[i])
+  
+# This creates a Season variable, by recording the years from the file name
+  df$Season<-substr(
+    file_name,
+    nchar(file_name)-7,
+    nchar(file_name)-4
+  )
+  
+# Likewise this creates a League variable
+  if(grepl("Premier_League", file_name)){
+    df$League<-"Premier League"
+  }
+  else if(grepl("Championship", file_name)){
+    df$League<-"Championship"
+  }
+  else if(grepl("League_1", file_name)){
+    df$League<-"League 1"
+  }
+  else if(grepl("League_2", file_name)){
+    df$League<-"League 2"
+  }
+  
+  data_list[[i]]<-df
+}
+
+# This ensures that the dimensions of all of the data are the same by creating N/A columns for variables
+# that aren't recorded in certain seasons 
+all_columns<-unique(unlist(lapply(data_list, names)))
+data_list<-lapply(data_list, function(df){
+  missing_columns<-setdiff(all_columns, names(df))
+  df[missing_columns]<-NA
+  df<-df[all_columns]
+  return(df)
+})
+
+# Creating the data frame
+data<-do.call(rbind, data_list)
+```
+
+Exporting so that other group members can access: (I've made this into a comment so it doesn't recreate an identical Excel file that overwrites itself each times the file is run)
+
+```{r}
+#write.csv(data, "../processed-data/football_data_halfclean.csv", row.names = FALSE)
+```
+
+
+## 2. EDA
+
+Now we will use our 'half-clean' dataset to perform some Exploratory Data Analysis. Firstly, we might want to investigate how similar the Premier League data is to that of the lower leagues, and it would be useful to get some visualisation for this. To do this, we will create tables showing how the outcomes H (Home Win), D (Draw), and A (Away Win) are distributed for each league over the 23 seasons:
+
+```{r}
+results_proportions<-prop.table(table(data$FTR, data$League), margin = 2)
+results_proportions
+```
+
+We can plot each of the columns on a bar chart:
+
+```{r}
+barplot(
+  results_proportions[c("H","D","A"), ],
+  beside = FALSE,
+  col=c("darkblue", "grey", "darkred"),
+  ylim=c(0,1),
+  main="Match Outcome Proportions by League",
+  xlab = "League",
+  ylab="Proporion of Matches"
+)
+legend("topright",
+       legend = c("Home Win", "Draw", "Away Win"),
+       fill=c("darkblue", "grey", "darkred"),
+       cex=0.8)
+```
+
+This shows that the leagues have largely similar distributions of outcomes between these seasons, which is evidence that points in favour of being able to use the data for predictions across division.  
+
+The main noticeable difference between the Premier League and the lower leagues is that there are a lesser proportion of draws in the top league - and this defecit seems to be almost entirely made up in a higher proportion of Home wins. This suggests that having the home advantage may have a stronger effect that tips a draw into a win for the home team, more times on average in the top division. 
+
+But this doesn't tell the full tale - as it's an aggregated proportion over 23 years. It could be that in the seasons themselves, vastly different things were happening in each league. Therefore we will plot line graphs for these outcome proportions for each league over time:
+
+```{r}
+seasons<-sort(unique(data$Season))
+season_years<-2003:(2003 + length(seasons) - 1)
+leagues<-unique(data$League)
+
+par(mfrow=c(2,2))
+
+for(league in leagues){
+  league_data<-data[data$League==league, ]
+  proportions<-sapply(seasons, function(s){
+    matches<-league_data[league_data$Season==s, "FTR"]
+    prop.table(table(factor(matches, levels = c("H", "D", "A"))))
+  })
+  matplot(season_years, t(proportions),
+        type="l", lty = 1, lwd=2,
+        col=c("blue", "green", "red"),
+        ylim=c(0,1),
+        main = league,
+        xlab="Season", ylab = "Proportion of Matches")
+  legend("right", legend = c("Home Win", "Draw", "Away Win"),
+       col = c("blue", "green", "red"),
+       lty=1, lwd=2, cex=0.7)
+}
+```
+
+
+
+
+
+
