@@ -283,10 +283,11 @@ We have a slight idea now of how the SVMs are doing with this classification (th
 ## 3. Finding the Strongest Models through K-fold Cross Validation, and CV Performance Comparison
 
 Here we perform 5-Fold Cross Validation to get the best combination of parameter values for 'cost' and 'gamma'. 
-We loop through 3 values of each: for cost 0.5, 2, and 8; for gamma 0.01, 0.05 and 0.2 therefore 9 combinations.
-Unfortunately over 5 folds this leaves us with 45 SVMs to fit for both Betting and Non-Betting datasets (so 90 total), which takes a long time to run but is just about doable over a full day.
+We loop through 3 values of each: for cost 0.5, 2, and 8; for gamma 0.01, 0.05 and 0.2 therefore 9 combinations. The loss function used is just the misclassification rate.
 
-If it was feasible, more parameter values would have been tried. In order to avoid having to run this extremely computationally expensive operation each time the file was run through; the final, best performing SVM model for both cases was saved in an RDS file in my named folder for easy access. The code that was originally run is below, but turned into a comment(s).
+Unfortunately over 5 folds this leaves us with 45 SVMs to fit for both Betting and Non-Betting datasets (so 90 total), which takes a long time to run but is just about doable over a full day. If it was feasible, more parameter values would have been tried. 
+
+In order to avoid having to run this extremely computationally expensive operation each time the file was run through; the final, best performing SVM model for both cases was saved in an RDS file in my named folder for easy access. The code that was originally run is below, but turned into a comment(s).
 
 ```{r}
 # Initializing with a given seed in order to be repeatable
@@ -747,6 +748,17 @@ print(multiclass_auc)
 Either can be used but they are calculated differently. The Macro-average AUC gives each outcome the same weighting and averages each of their one-vs-rest AUCs. Meanwhile the Multi-class AUC uses the pairwise AUCs (not on the graph) for each combination of outcomes and averages between them.  
 
 From the ROC curves, we can see that while obviously the Draw outcome's ROC curve was dominated by the other two, and it had the lowest AUC, the highest AUC was actually for Away wins. This differs from the hierarchy established by the class-specific Recall, Precision and F1 scores, where Home win was king. This suggests that although the SVM had more success classifying Home wins at its own probability decision threshold, the prediction probabilities it calculated were overall better - when going over all thresholds - at distinguishing Away wins from the other outcomes. 
+
+An important metric we can take in order to compare the SVM against other classification methods is the log loss/cross entropy. This is also calculated using the prediction probabilities:
+
+```{r}
+# This low value of epsilon is just to prevent any attempts at calculating log(0)
+epsilon <- 1e-15
+actual_probabilities <- prob_B[cbind(seq_along(actual), match(as.character(actual), colnames(prob_B)))]
+log_loss_B <- -mean(log(pmax(actual_probabilities, epsilon)))
+log_loss_B
+```
+The closer the value is to 0 the better; though it is of most use comparatively, so we will keep it in mind for after we've fitted the other types of models.
 
 We would like to further investigate the importance of the selected predictors. Before we begin, we will first create a heatmap to see the relationships they have with each other:
 
