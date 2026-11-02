@@ -1,4 +1,4 @@
-# How well can we classify outcomes from Premier League matches based on models trained on the lower leagues?
+# How well can we classify outcomes from Premier League matches using models trained on the lower divisions?
 
 ## Members in the group 
 - David Alufi
@@ -10,7 +10,7 @@ This project has a 28/24/24/24 equity split in Michael's favour.
 
 # Reading order
 All report content is in the directory:
-- report
+- report/
   
 The report takes the following structure:
 - 1.R_Data_Import_and_EDA.Rmd 
@@ -24,8 +24,13 @@ with html output of the Rmd included for convenience.
 
 
 
-Evidence: 
+# Evidence
+Our working is shown in our own directories,
+- AstijusA/
+- BinquanW/
+- DavidA/
+- MichaelM/
 
-Our working is shown in our own directories.
+Michael did the initial EDA and fitted the SVM model, David fitted the XGBoost Model, Astijus fitted the Multinomial Logistic Regression Model, and Binquan fitted the Random Forests and did some extra EDA. Together we wrote the wrapup after examining the whole of our
 
-Michael did the initial EDA and fitted the SVM model, David fitted the XGBoost Model, Astijus fitted the Multinomial Logistic Regression Model, and Binquan fitted the Random Forests and did some extra EDA. 
+
