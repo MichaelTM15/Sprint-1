@@ -952,10 +952,6 @@ Crucially, we showed that the performance of an SVM trained with lower league da
 
 
 
-```{r}
-#save.image(file = "C:/Users/micha/OneDrive/Documents/report_svm_environment.RData")
-#load("C:/Users/micha/OneDrive/Documents/report_svm_environment.RData")
-```
 
 
 
