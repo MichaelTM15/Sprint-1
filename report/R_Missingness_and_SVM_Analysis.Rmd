@@ -956,7 +956,7 @@ For our chosen 'best' SVM model, we got the following test metrics:
 test_metrics$overall
 ```
 
-including a test set accuracy of 60.14%. We also had a Macro-average AUC of 0.7363, and a Multi-class AUC of 0.7252.
+including a test set accuracy of 60.14%. We also had a Macro-average AUC of 0.7363, a Multi-class AUC of 0.7252, and a log loss of 0.8824.
 
 We also found that Draws were by far the hardest outcome for an SVM to classify, even with the additional information gained from Bet365's opening odds.
 
