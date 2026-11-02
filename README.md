@@ -37,7 +37,7 @@ and the raw and processed data Excel files are found in:
 - data/
 - processed-data/
   
-Michael did the initial EDA and fitted the SVM model, David fitted the XGBoost Model, Astijus fitted the Multinomial Logistic Regression Model, and Binquan fitted the Random Forests and did some extra EDA. Together we wrote the wrapup after examining the whole of our
+Michael did the initial EDA and fitted the SVM model, David fitted the XGBoost Model, Astijus fitted the Multinomial Logistic Regression Model, and Binquan fitted the Random Forests and did some extra EDA. Together we wrote the wrapup after examining the entirety of our findings.
 
 # References
 - https://football-data.co.uk/data.php
