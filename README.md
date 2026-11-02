@@ -1,6 +1,10 @@
 # How well can we classify outcomes from Premier League matches based on models trained on the lower leagues?
 
-Members in the group: David Alufi, Michael McDonagh, Astijus Armonavicius, Binquan Wang
+## Members in the group 
+- David Alufi
+- Michael McDonagh
+- Astijus Armonavicius
+- Binquan Wang
 
 This project has a 28/24/24/24 equity split in Michael's favour.
 
