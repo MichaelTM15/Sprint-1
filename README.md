@@ -8,9 +8,18 @@
 
 This project has a 28/24/24/24 equity split in Michael's favour.
 
-Reading order:
+# Reading order
+All report content is in the directory:
+- report
+The report takes the following structure:
+- 1.R_Data_Import_and_EDA.Rmd 
+- 2.R_Missingness_and_SVM_Analysis.Rmd 
+- 3.Multinomial_Logistic_Regression.Rmd 
+- 4.XGBoost_Analysis.pdf
+- 5.RandomForest Report and EDA  
+with html output of the Rmd included for convenience.
 
-Requirements:
+# Requirements
 
 
 
