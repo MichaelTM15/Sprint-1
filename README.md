@@ -18,11 +18,12 @@ The report takes the following structure:
 - 3.Multinomial_Logistic_Regression.Rmd 
 - 4.XGBoost_Analysis.pdf
 - 5.RandomForest Report and EDA
+- 6.Wrapup.pdf
   
 with html output of the Rmd included for convenience.
 
 # Requirements
-Required packages for the files are given at the start of each, they may need to installed before being loaded. For the SVM file, some RDS files are read from the MichaelM folder, so the working directory should be set to "~GitHub/Sprint-1" or equivalent.
+Required packages for the files are given at the start of each, they may need to installed before being loaded. For the SVM file, some RDS files are read from the MichaelM folder, so the working directory should be set to "~GitHub/Sprint-1" or equivalent. Other files may also read from the data and processed-data folders.
 
 
 # Evidence
@@ -38,4 +39,6 @@ and the raw and processed data Excel files are found in:
   
 Michael did the initial EDA and fitted the SVM model, David fitted the XGBoost Model, Astijus fitted the Multinomial Logistic Regression Model, and Binquan fitted the Random Forests and did some extra EDA. Together we wrote the wrapup after examining the whole of our
 
-
+# References
+- https://football-data.co.uk/data.php
+- https://pmc.ncbi.nlm.nih.gov/articles/PMC3900052/
