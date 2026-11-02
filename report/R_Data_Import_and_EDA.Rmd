@@ -21,7 +21,7 @@ We won't go through the names and meanings of all of the recorded variables, but
 Packages to load in order to run the file:
 
 ```{r}
-
+library(gplots)
 ```
 
 
@@ -355,7 +355,7 @@ Now we will begin to remove some variables that we don't want the classification
 
 We decided to not include the Time of kickoff and name of the Referee as we don't want to introduce unnecessary variance to any model which trains on these, in case there happens to be some association to match results. 
 
-Date and Season, and Division and League respectively overlap with each other. We want to consider the lower leagues as a full, combined dataset, which is why we removed it. Taking into account changes in the football landscape over time is a complex task when creating a model, and we don't want to have to deal with assuming any dependence between the results. So we remove when the games were played and treat each match as independent of the others and of when it was played.
+Date and Season, and Division and League respectively overlap with each other. We want to consider the lower leagues as a full, combined dataset, which is why we remove their tags. Taking into account changes in the football landscape over time is a complex task, and when creating a model we don't want to have to make any assumptions about dependence between the results across multiple seasons. So we will remove when the games were played and will treat each match as separate observation, without accounting for any such possible dependence.
 
 Some less obvious variables we remove are the Home and Away Team names. This is to prevent the models from trying to learn which teams are stronger, which can change between seasons (which we've already removed).
 
@@ -418,29 +418,37 @@ As before, exporting so that other group members can access: (I've made this int
 We end with some heat maps of the predictors that survived, and are in the current training and test data. Keep in mind that not necessarily all of them will be used, as we have to undergo missingness checks and decide on whether or not imputation is wanted/needed. This will show how the relationships they have with each other look:
 
 ```{r}
-make_heatmap<-function(dataset, plot_title){
-  numeric_data<-dataset[, sapply(dataset, is.numeric), drop = FALSE]
-  usable<-sapply(numeric_data, function(x){
-    sum(!is.na(x))>=2 && length(unique(x[!is.na(x)]))>1
-  })
-  numeric_data<-numeric_data[, usable, drop = FALSE]
-  correlations<-cor(numeric_data, use="pairwise.complete.obs")
-  
-  heatmap_colours<-colorRampPalette(c("yellow", "orange", "red"))(100)
-  heatmap(correlations, symm=TRUE, scale="none", col=heatmap_colours,
-          breaks=seq(-1,1,length.out=101), main=plot_title)
-  legend("topright", legend=c("Negative (~ -1)", "Zero (~ 0)", "Positive (~ +1)"),
-         fill=c("yellow", "orange", "red"), cex=0.7, bty="n")
-}
-# Just note that the color scale should be continuous but it's hard to see, i.e. orange doesn't mean exactly 0 etc.
+train_predictor_correlations <- cor(train_data[, !names(train_data) %in% "FTR", drop=FALSE], 
+                                    use = "pairwise.complete.obs")
+
+test_predictor_correlations <- cor(test_data[, !names(test_data) %in% "FTR", drop=FALSE], 
+                                    use = "pairwise.complete.obs")
+
+heatmap_colours <- colorRampPalette(c("yellow", "orange", "red"))(100)
 ```
 
 ```{r}
-make_heatmap(train_data, "Training Data Predictor Heatmap")
+heatmap.2(
+  train_predictor_correlations,
+  symm = TRUE,
+  trace = "none",
+  col = heatmap_colours,
+  breaks = seq(-1, 1, length.out = 101),
+  key = TRUE,
+  main = "           Training Data Predictor Heatmap"
+)
 ```
 
 ```{r}
-make_heatmap(test_data, "Test Data Predictor Heatmap")
+heatmap.2(
+  test_predictor_correlations,
+  symm = TRUE,
+  trace = "none",
+  col = heatmap_colours,
+  breaks = seq(-1, 1, length.out = 101),
+  key = TRUE,
+  main = "           Test Data Predictor Heatmap"
+)
 ```
 
 The predictors seem to interact in a broadly similar way across the training and test sets, though they are not completely identical.
