@@ -367,8 +367,11 @@ main one being that they use the decision boundary with the maximum
 margin between classes. This can often make help them perform better
 than other decision boundary based classifiers like logistic regression.
 They also don’t need this decision boundary to be linear. Furthermore
-SVMs generally perform well on high-dimensional data without much memory
-usage needed for predictions once fitted.</p>
+SVMs generally perform well on high-dimensional data with what can be a
+relatively manageable amount of memory usage needed for predictions once
+fitted. We will use a radial basis function (RBF) kernel to allow the
+SVM to learn potential non-linear relationships between the
+predictors.</p>
 <p>Packages to load in order to run the file:</p>
 <pre class="r"><code>library(e1071)
 library(caret)</code></pre>
@@ -729,15 +732,17 @@ CV Performance Comparison</h2>
 <p>Here we perform 5-Fold Cross Validation to get the best combination
 of parameter values for ‘cost’ and ‘gamma’. We loop through 3 values of
 each: for cost 0.5, 2, and 8; for gamma 0.01, 0.05 and 0.2 therefore 9
-combinations. Unfortunately over 5 folds this leaves us with 45 SVMs to
-fit for both Betting and Non-Betting datasets (so 90 total), which takes
-a long time to run but is just about doable over a full day.</p>
-<p>If it was feasible, more parameter values would have been tried. In
-order to avoid having to run this extremely computationally expensive
-operation each time the file was run through; the final, best performing
-SVM model for both cases was saved in an RDS file in my named folder for
-easy access. The code that was originally run is below, but turned into
-a comment(s).</p>
+combinations. The loss function used is just the misclassification
+rate.</p>
+<p>Unfortunately over 5 folds this leaves us with 45 SVMs to fit for
+both Betting and Non-Betting datasets (so 90 total), which takes a long
+time to run but is just about doable over a full day. If it was
+feasible, more parameter values would have been tried.</p>
+<p>In order to avoid having to run this extremely computationally
+expensive operation each time the file was run through; the final, best
+performing SVM model for both cases was saved in an RDS file in my named
+folder for easy access. The code that was originally run is below, but
+turned into a comment(s).</p>
 <pre class="r"><code># Initializing with a given seed in order to be repeatable
 
 #set.seed(123)
@@ -1294,6 +1299,18 @@ SVM had more success classifying Home wins at its own probability
 decision threshold, the prediction probabilities it calculated were
 overall better - when going over all thresholds - at distinguishing Away
 wins from the other outcomes.</p>
+<p>An important metric we can take in order to compare the SVM against
+other classification methods is the log loss/cross entropy. This is also
+calculated using the prediction probabilities:</p>
+<pre class="r"><code># This low value of epsilon is just to prevent any attempts at calculating log(0)
+epsilon &lt;- 1e-15
+actual_probabilities &lt;- prob_B[cbind(seq_along(actual), match(as.character(actual), colnames(prob_B)))]
+log_loss_B &lt;- -mean(log(pmax(actual_probabilities, epsilon)))
+log_loss_B</code></pre>
+<pre><code>## [1] 0.8823976</code></pre>
+<p>The closer the value is to 0 the better; though it is of most use
+comparatively, so we will keep it in mind for after we’ve fitted the
+other types of models.</p>
 <p>We would like to further investigate the importance of the selected
 predictors. Before we begin, we will first create a heatmap to see the
 relationships they have with each other:</p>
@@ -1503,7 +1520,8 @@ metrics:</p>
 <pre><code>##   Accuracy     Kappa Macro_Precision Macro_Recall  Macro_F1
 ## 1 0.601373 0.3471211       0.5274133    0.5307982 0.4884505</code></pre>
 <p>including a test set accuracy of 60.14%. We also had a Macro-average
-AUC of 0.7363, and a Multi-class AUC of 0.7252.</p>
+AUC of 0.7363, a Multi-class AUC of 0.7252, and a log loss of
+0.8824.</p>
 <p>We also found that Draws were by far the hardest outcome for an SVM
 to classify, even with the additional information gained from Bet365’s
 opening odds.</p>
