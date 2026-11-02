@@ -22,8 +22,8 @@ The report takes the following structure:
 with html output of the Rmd included for convenience.
 
 # Requirements
-Required packages for the files are given at the start of each. They may need to installed before being loaded. 
-Saved 
+Required packages for the files are given at the start of each, they may need to installed before being loaded. For the SVM file, some RDS files are read from the MichaelM folder, so the working directory should be set to "~GitHub/Sprint-1" or equivalent.
+
 
 # Evidence
 Our working is shown in our own directories,
@@ -32,6 +32,10 @@ Our working is shown in our own directories,
 - DavidA/
 - MichaelM/
 
+and the raw and processed data Excel files are found in:
+- data/
+- processed-data/
+  
 Michael did the initial EDA and fitted the SVM model, David fitted the XGBoost Model, Astijus fitted the Multinomial Logistic Regression Model, and Binquan fitted the Random Forests and did some extra EDA. Together we wrote the wrapup after examining the whole of our
 
 
