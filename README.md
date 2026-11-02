@@ -20,7 +20,7 @@ The report takes the following structure:
 - 5.RandomForest Report and EDA
 - 6.Wrapup.pdf
   
-with html output of the Rmd included for convenience.
+with html output of the Rmd content included for convenience.
 
 # Requirements
 Required packages for the files are given at the start of each, they may need to installed before being loaded. For the Rmd files, these consist of:
