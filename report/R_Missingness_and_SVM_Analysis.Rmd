@@ -753,9 +753,7 @@ We would like to further investigate the importance of the selected predictors. 
 ```{r}
 predictor_correlations <- cor(train_data_B[, selected_predictors_B, drop=FALSE], use = "pairwise.complete.obs")
 
-heatmap_colours <- colorRampPalette(
-  c("blue", "white", "red")
-)(100)
+heatmap_colours <- colorRampPalette(c("blue", "white", "red"))(100)
 
 heatmap.2(
   predictor_correlations,
