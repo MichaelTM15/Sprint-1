@@ -23,7 +23,7 @@ The report takes the following structure:
 with html output of the Rmd included for convenience.
 
 # Requirements
-Required packages for the files are given at the start of each, they may need to installed before being loaded. For the Rmd files, these consists of:
+Required packages for the files are given at the start of each, they may need to installed before being loaded. For the Rmd files, these consist of:
 - gplots, e1071, caret, mice, pROC, ggplot2, patchwork
 
 For the Python files, these consist of:
