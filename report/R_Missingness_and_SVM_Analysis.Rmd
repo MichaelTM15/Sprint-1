@@ -14,7 +14,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 In this file we will investigate missingness in the data sets that were exported after the EDA, and fit a chosen Support Vector Machine model to the data with selected predictors. 
 
-SVMs offer  many advantages over other classification methods - the main one being that they use the decision boundary with the maximum margin between classes. This can often make help them perform better than other decision boundary based classifiers like logistic regression. They also don't need this decision boundary to be linear. Furthermore SVMs generally perform well on high-dimensional data with what can be a relatively manageable amount of memory usage needed for predictions once fitted.
+SVMs offer  many advantages over other classification methods - the main one being that they use the decision boundary with the maximum margin between classes. This can often make help them perform better than other decision boundary based classifiers like logistic regression. They also don't need this decision boundary to be linear. Furthermore SVMs generally perform well on high-dimensional data with what can be a relatively manageable amount of memory usage needed for predictions once fitted. We will use a radial basis function (RBF) kernel to allow the SVM to learn potential non-linear relationships between the predictors.
 
 Packages to load in order to run the file:
 
