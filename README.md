@@ -17,12 +17,13 @@ The report takes the following structure:
 - 2.R_Missingness_and_SVM_Analysis.Rmd 
 - 3.Multinomial_Logistic_Regression.Rmd 
 - 4.XGBoost_Analysis.pdf
-- 5.RandomForest Report and EDA  
+- 5.RandomForest Report and EDA
+  
 with html output of the Rmd included for convenience.
 
 # Requirements
-
-
+Required packages for the files are given at the start of each. They may need to installed before being loaded. 
+Saved 
 
 # Evidence
 Our working is shown in our own directories,
