@@ -23,7 +23,13 @@ The report takes the following structure:
 with html output of the Rmd included for convenience.
 
 # Requirements
-Required packages for the files are given at the start of each, they may need to installed before being loaded. For the SVM file, some RDS files are read from the MichaelM folder, so the working directory should be set to "~GitHub/Sprint-1" or equivalent. Other files may also read from the data and processed-data folders.
+Required packages for the files are given at the start of each, they may need to installed before being loaded. For the Rmd files, these consists of:
+- gplots, e1071, caret, mice, pROC, ggplot2, patchwork
+
+For the Python files, these consist of:
+- pandas, numpy, matplotlib, scikit-learn, IPython, pathlib 
+
+For the SVM file, some RDS files are read from the MichaelM folder, so the working directory should be set to "~GitHub/Sprint-1" or equivalent. Other files may also read from the data and processed-data folders.
 
 
 # Evidence
