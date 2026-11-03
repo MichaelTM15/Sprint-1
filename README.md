@@ -28,7 +28,7 @@ Required packages for the files are given at the start of each, they may need to
 - gplots, e1071, caret, mice, pROC, ggplot2, patchwork
 
 For the Python files, these consist of:
-- pandas, numpy, matplotlib, scikit-learn, IPython, pathlib 
+- pandas, numpy, matplotlib, scikit-learn, IPython, pathlib, xgboost, seaborn
 
 For the SVM file, some RDS files are read from the MichaelM folder, so the working directory should be set to "~GitHub/Sprint-1" or equivalent. Other files may also read from the data and processed-data folders.
 
