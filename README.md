@@ -20,7 +20,7 @@ The report takes the following structure:
 - 4.Multinomial_Logistic_Regression.Rmd
 - 5a.XGBoost_Code.pynb
 - 5b.XGBoost_Analysis.pdf
-- 6.Wrapup.pdf
+- 6.Wrapup.md
   
 with html output of the Rmd and ipynb content included for convenience.
 
