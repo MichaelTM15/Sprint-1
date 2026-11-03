@@ -18,14 +18,15 @@ The report takes the following structure:
 - 2.R_Missingness_and_SVM_Analysis.Rmd 
 - 3.RandomForest.ipynb
 - 4.Multinomial_Logistic_Regression.Rmd
-- 5.XGBoost_Analysis.pdf
+- 5a.XGBoost_Code.pynb
+- 5b.XGBoost_Analysis.pdf
 - 6.Wrapup.pdf
   
 with html output of the Rmd and ipynb content included for convenience.
 
 # Requirements
 Required packages for the files are given at the start of each, they may need to installed before being loaded. For the Rmd files, these consist of:
-- gplots, e1071, caret, mice, pROC, ggplot2, patchwork
+- gplots, e1071, caret, mice, pROC, ggplot2, patchwork, MASS, nnet, knitr,
 
 For the Python files, these consist of:
 - pandas, numpy, matplotlib, scikit-learn, IPython, pathlib, xgboost, seaborn
