@@ -13,14 +13,15 @@ All report content is in the directory:
 - report/
   
 The report takes the following structure:
-- 1.R_Data_Import_and_EDA.Rmd 
+- 1a.R_Data_Import_and_EDA.Rmd
+- 1b.EDA Binquan Wang Report .ipynb 
 - 2.R_Missingness_and_SVM_Analysis.Rmd 
-- 3.Multinomial_Logistic_Regression.Rmd 
-- 4.XGBoost_Analysis.pdf
-- 5.RandomForest Report and EDA
+- 3.RandomForest.ipynb
+- 4.Multinomial_Logistic_Regression.Rmd
+- 5.XGBoost_Analysis.pdf
 - 6.Wrapup.pdf
   
-with html output of the Rmd content included for convenience.
+with html output of the Rmd and ipynb content included for convenience.
 
 # Requirements
 Required packages for the files are given at the start of each, they may need to installed before being loaded. For the Rmd files, these consist of:
